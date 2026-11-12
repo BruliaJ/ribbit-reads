@@ -577,7 +577,7 @@ function renderWords(){$("#wordsFrog").innerHTML=frogSVG(undefined,undefined,"bo
   $("#teachBtn").onclick=()=>{const raw=cleanWord(inp.value);if(!raw)return;teachWord(raw,nm.checked)};
   $("#savedWords").innerHTML=S.mine.length?S.mine.map(x=>`<button class="chip" data-w="${esc(x)}">${esc(x)}</button>`).join(""):`<p class="hint">Words you learn are saved here to practice again.</p>`;
   $("#savedWords").querySelectorAll(".chip").forEach(c=>c.onclick=()=>teachWord(c.dataset.w,/^[A-Z]/.test(c.dataset.w)));
-  document.querySelectorAll(".mic").forEach(b=>{b.hidden=!micOK;b.onclick=()=>listen(b)});$("#askNote").hidden=!micOK;$("#noMic").hidden=micOK}
+  document.querySelectorAll(".mic").forEach(b=>{b.hidden=!micOK;b.onclick=()=>listen(b)});$("#askCard").hidden=!micOK}
 function teachWord(raw,isName){let w=cleanWord(raw).slice(0,16);if(!w)return;w=isName?capName(w):w.toLowerCase();
   /* names are practised but never kept: they may be a child's real name */
   if(!isName){if(!S.mine.includes(w))S.mine.unshift(w);S.mine=S.mine.slice(0,24);save()}

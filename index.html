@@ -52,9 +52,8 @@
   </section>
   <section id="words" hidden><div class="col">
     <div class="hero"><div class="duo" id="wordsFrog"></div><div><h1 style="font-size:clamp(28px,6vw,40px)">Ask Pip!</h1><p>Learn to spell any word or name.</p></div></div>
-    <div class="card askmic"><button class="mic" data-for="inWord" data-ask="1" aria-label="Ask Pip with your voice">🎤</button>
-      <p class="hint" id="askNote">Tap and say “How do you spell dinosaur?” or “My name is Mia.”</p>
-      <p class="hint" id="noMic" hidden>Type your word below. (Talking to Pip works in Chrome and the Claude desktop app.)</p></div>
+    <div class="card askmic" id="askCard" hidden><button class="mic" data-for="inWord" data-ask="1" aria-label="Ask Pip with your voice">🎤</button>
+      <p class="hint" id="askNote">Tap and say “How do you spell dinosaur?” or “My name is Mia.”</p></div>
     <div class="card" style="justify-items:stretch;text-align:left">
       <label class="fld" for="inWord"><span>A word or name</span></label><div class="inrow"><input id="inWord" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="like dinosaur or Mia"><button class="mic" data-for="inWord" aria-label="Say a word">🎤</button></div>
       <label class="check"><input type="checkbox" id="isName"> It's a name (starts with a capital letter)</label>

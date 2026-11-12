@@ -337,3 +337,12 @@ main.wrap{max-width:980px;margin:0 auto;padding-block:14px 90px;padding-left:max
 body.focus .nav{display:none}
 .voicenote{margin:0;background:var(--sun-soft);border-radius:16px;padding:12px 16px;font-weight:700;line-height:1.45}
 h1:focus,h2:focus{outline:none}
+/* phones: one compact header row (frog logo + stars, coins, sound, grown-ups), then the menu */
+@media (max-width:480px){
+  .logo{display:none}
+  .hwrap{flex-wrap:wrap;padding-block:4px}
+  .brandrow{flex:0 0 auto}
+  .hud{margin-left:auto}
+  .pill{padding:4px 8px;min-height:40px}
+  .nav button{min-height:48px}
+}
