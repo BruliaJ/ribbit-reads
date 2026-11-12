@@ -1,0 +1,69 @@
+<title>Ribbit Reads</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Fredoka:wght@500;600;700&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/*CSS*/
+</style>
+<div id="bd" aria-hidden="true"></div>
+<header><div class="hwrap">
+  <div class="brandrow"><span id="brandFrog" aria-hidden="true"></span><span class="logo">Ribbit Reads</span></div>
+  <div class="hud"><span class="pill" aria-label="Stars">⭐ <span id="starCount">0</span></span><span class="pill" aria-label="Coins"><svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="#FFD23F" stroke="#B87400" stroke-width="1.6"/></svg> <span id="coinCount">0</span></span><button class="iconbtn" id="muteBtn" aria-label="Sound on or off">🔊</button><button class="iconbtn" data-go="grown" aria-label="Grown-ups">🔒</button></div>
+  <nav class="nav" aria-label="Main">
+    <button data-go="map"><span class="ni">🗺️</span>Pond</button>
+    <button data-go="abc"><span class="ni">🔤</span>ABC</button>
+    <button data-go="words"><span class="ni">🎤</span>Words</button>
+    <button data-go="games"><span class="ni">🎮</span>Games</button>
+    <button data-go="closet"><span class="ni">🎩</span>Closet</button>
+    <button data-go="book"><span class="ni">⭐</span>Stickers</button>
+  </nav>
+</div></header>
+<main class="wrap">
+  <section id="map"><div class="col">
+    <div class="hero"><div class="duo" id="heroDuo"></div><div><h1>Ribbit Reads</h1><p id="heroHi"></p></div></div>
+    <div class="card playcard" id="playCard"></div>
+    <button class="btn sky" id="abcBtn" style="justify-self:center">🔤 Practice any letter, big and little</button>
+    <div class="ponds" id="ponds"></div>
+    <div class="section-title"><h2>Your buddy</h2><span>Pick a pal to hop with Pip</span></div>
+    <div class="card" id="mapPals" style="justify-items:stretch"></div>
+  </div></section>
+  <section id="lesson" hidden>
+    <div class="lesson-head"><button class="x" id="quit" aria-label="Leave the lesson">✕</button><div class="trail" id="trail" aria-hidden="true"></div></div>
+    <div id="stage"></div>
+  </section>
+  <section id="reward" hidden></section>
+  <section id="games" hidden>
+    <div class="section-title"><h2>Games</h2><span>Earn coins for the Closet</span></div>
+    <div class="games" id="gameGrid"></div>
+  </section>
+  <section id="game" hidden><div class="lesson-head"><button class="x" id="gquit" aria-label="Back to games">✕</button><h2 id="gtitle" style="font-size:24px;background:var(--chip);border-radius:14px;padding:6px 12px"></h2></div><div id="gstage"></div></section>
+  <section id="closet" hidden>
+    <div class="section-title"><h2>Closet</h2><span>Dress up Pip, pick a pond, a pen and a party</span></div>
+    <div class="preview" id="closetPreview"></div><div id="closetBody"></div>
+  </section>
+  <section id="book" hidden>
+    <div class="section-title"><h2>Sticker book</h2><span>Everything you've learned</span></div><div id="bookBody"></div>
+  </section>
+  <section id="words" hidden><div class="col">
+    <div class="hero"><div class="duo" id="wordsFrog"></div><div><h1 style="font-size:clamp(28px,6vw,40px)">Ask Pip!</h1><p>Learn to spell any word or name.</p></div></div>
+    <div class="card askmic"><button class="mic" data-for="inWord" data-ask="1" aria-label="Ask Pip with your voice">🎤</button>
+      <p class="hint" id="askNote">Tap and say “How do you spell dinosaur?” or “My name is Mia.”</p>
+      <p class="hint" id="noMic" hidden>Type your word below. (Talking to Pip works in Chrome and the Claude desktop app.)</p></div>
+    <div class="card" style="justify-items:stretch;text-align:left">
+      <label class="fld" for="inWord"><span>A word or name</span></label><div class="inrow"><input id="inWord" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="like dinosaur or Mia"><button class="mic" data-for="inWord" aria-label="Say a word">🎤</button></div>
+      <label class="check"><input type="checkbox" id="isName"> It's a name (starts with a capital letter)</label>
+      <div id="wordPrev" style="text-align:center"></div><p class="hint" id="wordNote"></p>
+      <div class="row ctr"><button class="btn big" id="teachBtn">Teach me! ✨</button></div>
+    </div>
+    <div class="card"><h3>Words you've learned</h3><div class="chips" id="savedWords"></div></div>
+  </div></section>
+  <section id="abc" hidden>
+    <div class="section-title"><h2>ABC practice</h2><span>Read and write every letter, big and little</span></div><div id="abcBody"></div>
+  </section>
+  <section id="grown" hidden><div id="grownBody"></div></section>
+</main>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="toast" id="toast" hidden role="status"></div>
+<script>
+/*JS*/
+</script>
