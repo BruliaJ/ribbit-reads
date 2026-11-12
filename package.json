@@ -11,7 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc -b",
     "e2e": "playwright test",
-    "app:sync": "npm run build && cap sync"
+    "app:sync": "npm run build && cap sync",
+    "gen:icons": "npm run build && node scripts/gen-icons.mjs"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "8.0.2",
