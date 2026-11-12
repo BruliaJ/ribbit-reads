@@ -309,7 +309,7 @@ STEPS.read=(card,s)=>{const n=LS.n;const d=pickDec(n);LS.used.add(d.w);LS.lastRe
   else{const pool=decodableAt(n).filter(x=>x.w!==d.w&&x.ch.length===d.ch.length);const near=pool.filter(x=>x.ch.filter((c,i)=>c===d.ch[i]).length>=d.ch.length-1);
     const opts=shuffle([d,...shuffle(near.length>=2?near:pool).slice(0,2)]);
     choice(card,{mode:"Read it",text:`Pip says a word. Read the words and tap the one Pip said.`,items:opts.map(x=>({...x,say:x.w})),nameThem:false,isRight:b=>b.w===d.w,
-      optHTML:b=>`<span style="font-size:44px">${esc(b.w)}</span>`,prompt:()=>sayThen("Find the word",200,d.w),after:async()=>{await sayThen(d.w+"!")}})}};
+      optHTML:b=>`<span style="font-size:clamp(24px,7.5vw,44px)">${esc(b.w)}</span>`,prompt:()=>sayThen("Find the word",200,d.w),after:async()=>{await sayThen(d.w+"!")}})}};
 
 /* ----- 8. spelling with sound boxes ----- */
 STEPS.spell=(card,s)=>{const n=LS.n;const d=LS.lastRead&&LS.lastRead.ch.length<=4&&Math.random()<.4?LS.lastRead:pickDec(n,x=>x.ch.length<=4);LS.used.add(d.w);LS.lastSpell=d;
