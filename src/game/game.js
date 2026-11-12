@@ -5,15 +5,18 @@ import { glyph, layoutText } from '../content/glyphs';
 import { FROGS, HATS, PENS, PARTIES, CATS, GIFT_ORDER } from '../content/shop';
 import { sn, ONE, MULTI, pics, rimeOf, onsetOf, rimeText, RHY, chunks, chunkSnd, DEC, letterSet, decodableAt, ADDP, SUBP, ABC, confusers, capWrong } from '../logic/phonics';
 import { planLesson, skillsFor } from '../logic/plan';
+import { tolerance, lookPoints, advance, resumeAt, strokeDone, farOff, dist } from '../logic/trace';
 import { parseAsk, cleanWord, capName } from '../logic/ask';
 import { fresh, parseSave, mergeSaves } from '../logic/state';
 import { speakOnce, stopSpeech, unlockSpeech, voiceStatus, setClaudeTTS, hasClaudeTTS } from '../host/speech';
-import { readRaw, writeRaw, backup, restoreFromApp, onOtherTabSave } from '../host/storage';
+import { readRaw, writeRaw, backup, restoreFromApp, onOtherTabSave, eraseAll, needsRewrite } from '../host/storage';
 import { isApp, onAndroidBack } from '../host/app';
 import { ROSTER, palSVG } from './pals';
 import { hatSVG } from './hats';
 
 /* ===================== HELPERS ===================== */
+/* how a sound is written for grown-ups: /ā/ not /A/ */
+const PH_LABEL={A:"ā",E:"ē",I:"ī",O:"ō",U:"ū",ks:"ks",kw:"kw"};const phl=p=>"/"+(PH_LABEL[p]||p)+"/";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -100,6 +103,7 @@ let current="map",PAUSED=null;
 function show(id,{push=true}={}){
   if(current==="lesson"&&id!=="lesson")pauseLesson();
   if(id!=="lesson"&&id!=="game"){killPad();stopGame()}
+  if(current==="grown"&&id!=="grown")gateOK=false;
   current=id;SECTIONS.forEach(s=>$("#"+s).hidden=s!==id);
   document.body.classList.toggle("focus",id==="lesson"||id==="game");
   document.querySelectorAll("header [data-go]").forEach(b=>b.setAttribute("aria-current",b.dataset.go===id?"true":"false"));scrollTo(0,0);
@@ -175,8 +179,9 @@ function choice(card,{mode,text,items,isRight,prompt,nameThem=true,after,labels=
   card.innerHTML=`<div class="mode">${mode}</div>${bubble(text)}<div class="opts">${items.map((b,i)=>`<button class="opt" data-i="${i}" aria-label="${esc(b.w)}">${optHTML?optHTML(b):`<span class="emo">${b.e}</span>${labels?`<small>${esc(b.w)}</small>`:""}`}</button>`).join("")}</div>
    <div class="row ctr"><button class="btn alt sm" id="again">🔊 Hear it again</button></div><div class="feedback" aria-live="polite"></div>`;
   const opts=[...card.querySelectorAll(".opt")],fb=card.querySelector(".feedback");let tries=0,locked=false;
-  const nameAll=async()=>{if(!nameThem)return;await sleep(200);for(let i=0;i<items.length;i++){if(!card.isConnected)return;opts.forEach(o=>o.classList.toggle("hl",+o.dataset.i===i));const ok=await speak1(items[i].say||items[i].w,1);await sleep(250)}opts.forEach(o=>o.classList.remove("hl"))};
-  const ask=async()=>{const id=++sayId;stopSay();const me=sayId;await prompt();if(me!==sayId)return;await nameAll()};
+  /* ask the question, then name each picture (pre-readers need to know 🧥 is "coat"). A tap or a new question stops it. */
+  const nameAll=async id=>{await sleep(200);for(let i=0;i<items.length;i++){if(!card.isConnected||id!==sayId)break;opts.forEach(o=>o.classList.toggle("hl",+o.dataset.i===i));await speak1(items[i].say||items[i].w,1);await sleep(250)}opts.forEach(o=>o.classList.remove("hl"))};
+  const ask=async()=>{if(await prompt()===false||!card.isConnected)return;const id=sayId;if(nameThem&&!locked)await nameAll(id)};
   card.querySelector("#again").onclick=ask;
   opts.forEach(o=>o.onclick=async()=>{if(locked||o.disabled)return;const b=items[+o.dataset.i];
     if(isRight(b)){locked=true;stopSay();opts.forEach(x=>x.classList.remove("hl"));o.classList.add("right");streak(!tries);sfx.good();fb.textContent=pick(PRAISE);fb.className="feedback good";mood(card.querySelector(".bubble .frog"),"happy");
@@ -191,7 +196,7 @@ STEPS.rhymeYN=(card,s)=>{const a=fresh1(RHY);const yes=Math.random()<.5;
   choice(card,{mode:"Rhyme time",text:`Do <b>${esc(a.w)}</b> and <b>${esc(b.w)}</b> rhyme? Rhymes sound the same at the end.`,items,nameThem:false,labels:false,
     optHTML:it=>`<span class="emo">${it.e}</span><small>${it.v?"Rhyme!":"No rhyme"}</small>`,
     isRight:it=>it.v===yes,
-    prompt:async()=>{await sayThen("Do these rhyme?",250,()=>hl(0),a.w,300,()=>hl(1),b.w,()=>hl(-1))},
+    prompt:()=>sayThen("Do these rhyme?",250,()=>hl(0),a.w,300,()=>hl(1),b.w,()=>hl(-1)),
     after:async()=>{await sayThen(yes?`Yes! ${a.w}, ${b.w}. They rhyme!`:`No. ${a.w}, ${b.w}. They end differently.`)}});
   const pr=document.createElement("div");pr.className="row ctr";pr.innerHTML=`<span class="hero-pic" id="pa">${a.e}</span><span class="hero-pic" style="font-size:40px">＋</span><span class="hero-pic" id="pb">${b.e}</span>`;
   card.insertBefore(pr,card.querySelector(".opts"));function hl(i){["#pa","#pb"].forEach((q,k)=>{const el=card.querySelector(q);if(el)el.style.transform=k===i?"scale(1.15)":""})}};
@@ -203,11 +208,11 @@ STEPS.rhymePick=(card,s)=>{const a=fresh1(RHY);const r=pick(ONE.filter(x=>x!==a&
 /* ----- 2. blending ----- */
 function padsHTML(n){return `<div class="padrow" aria-hidden="true">${Array.from({length:n},(_,i)=>`<div class="spad" data-p="${i}"></div>`).join("")}</div>`}
 function lightPads(card,i){card.querySelectorAll(".spad").forEach(p=>p.classList.toggle("lit",+p.dataset.p===i));if(i>=0)sfx.hop()}
-STEPS.onset=(card,s)=>{const a=fresh1(pics(ONE),b=>onsetOf(b).length>=1&&b.w!=="key"&&rimeText(b).length>=2);const on=onsetOf(a);
+STEPS.onset=(card,s)=>{const a=fresh1(pics(ONE),b=>onsetOf(b).length>=1&&rimeText(b).length>=2&&"aeiou".includes(b.ph[onsetOf(b).length])&&/^[aeiou][^aeiouy]+$/.test(rimeText(b)));const on=onsetOf(a);
   const items=shuffle([a,...others(pics(ONE),2,x=>x.e===a.e||rimeOf(x)===rimeOf(a)&&x.ph[0]===a.ph[0])]);
   const parts=[on.map(sn).join(" "),rimeText(a)];
   choice(card,{mode:"Put it together",text:`Pip says the start, then the end. Glue them together! <b>${esc(on.map(p=>"/"+p+"/").join(""))} … ${esc(rimeText(a))}</b>`,items,isRight:b=>b===a,
-    prompt:async()=>{await sayParts(parts,{lead:"Put it together.",gap:500,on:i=>lightPads(card,i)});await sleep(200)},
+    prompt:()=>sayParts(parts,{lead:"Put it together.",gap:500,on:i=>lightPads(card,i)}),
     after:async()=>{await sayThen(`${parts[0]}, ${parts[1]}. ${a.w}!`)}});
   card.querySelector(".opts").insertAdjacentHTML("beforebegin",padsHTML(2))};
 STEPS.syllBlend=(card,s)=>{const a=fresh1(MULTI);const items=shuffle([a,...others(MULTI,2,x=>x===a)]);
@@ -226,7 +231,7 @@ STEPS.iso=(card,s)=>{const pos=s.pos;const at=b=>pos==="first"?b.ph[0]:pos==="la
   const a=fresh1(pics(ONE),b=>at(b)&&!(pos!=="first"&&["ks"].includes(at(b))));const p=at(a);
   const items=shuffle([a,...others(pics(ONE),2,x=>!at(x)||at(x)===p||x.ph.includes(p)&&pos!=="middle")]);
   const word={first:"starts with",last:"ends with",middle:"has this sound in the middle:"}[pos];
-  choice(card,{mode:pos==="first"?"First sound":pos==="last"?"Last sound":"Middle sound",text:`Which one ${word} <b>/${esc(p)}/</b>?`,items,isRight:b=>at(b)===p,
+  choice(card,{mode:pos==="first"?"First sound":pos==="last"?"Last sound":"Middle sound",text:`Which one ${word} <b>${esc(phl(p))}</b>?`,items,isRight:b=>at(b)===p,
     prompt:()=>sayThen(`Which one ${word}`,120,sn(p),200,sn(p)),
     after:async b=>{await sayThen(b.w,200,`${pos==="first"?"starts":pos==="last"?"ends":"has"} ${sn(p)}`)}})};
 
@@ -247,20 +252,20 @@ STEPS.segment=(card,s)=>{const a=fresh1(pics(ONE),b=>b.ph.length>=2&&b.ph.length
 
 /* ----- 5. changing sounds (add, take away, swap) ----- */
 STEPS.addS=(card,s)=>{const [small,p,big]=pick(ADDP);const items=shuffle([big,small,...others(pics(ONE),1,x=>x===big||x===small)]);
-  choice(card,{mode:"Add a sound",text:`Say <b>${esc(small.w)}</b> ${small.e}. Now add <b>/${esc(p)}/</b> to the start. What's the new word?`,items,isRight:b=>b===big,
+  choice(card,{mode:"Add a sound",text:`Say <b>${esc(small.w)}</b> ${small.e}. Now add <b>${esc(phl(p))}</b> to the start. What's the new word?`,items,isRight:b=>b===big,
     prompt:()=>sayThen(`Say ${small.w}.`,300,`Now add`,sn(p),`to the start. What's the new word?`),after:async()=>{await sayThen(`${sn(p)}, ${small.w}. ${big.w}!`)}})};
 STEPS.delS=(card,s)=>{const [small,p,big]=pick(ADDP);const items=shuffle([small,big,...others(pics(ONE),1,x=>x===big||x===small)]);
-  choice(card,{mode:"Take a sound away",text:`Say <b>${esc(big.w)}</b> ${big.e}. Now say it without <b>/${esc(p)}/</b>. What's left?`,items,isRight:b=>b===small,
+  choice(card,{mode:"Take a sound away",text:`Say <b>${esc(big.w)}</b> ${big.e}. Now say it without <b>${esc(phl(p))}</b>. What's left?`,items,isRight:b=>b===small,
     prompt:()=>sayThen(`Say ${big.w}.`,300,`Now say it without`,sn(p),`What's left?`),after:async()=>{await sayThen(`${big.w} without ${sn(p)} is ${small.w}!`)}})};
 STEPS.subS=(card,s)=>{const [x,i,y]=pick(SUBP);const items=shuffle([y,x,...others(pics(ONE),1,b=>b===x||b===y)]);const from=x.ph[i],to=y.ph[i];
-  choice(card,{mode:"Swap a sound",text:`Say <b>${esc(x.w)}</b> ${x.e}. Change <b>/${esc(from)}/</b> to <b>/${esc(to)}/</b>. What's the new word?`,items,isRight:b=>b===y,
+  choice(card,{mode:"Swap a sound",text:`Say <b>${esc(x.w)}</b> ${x.e}. Change <b>${esc(phl(from))}</b> to <b>${esc(phl(to))}</b>. What's the new word?`,items,isRight:b=>b===y,
     prompt:()=>sayThen(`Say ${x.w}.`,300,`Change`,sn(from),`to`,sn(to),`What's the new word?`),after:async()=>{await sayThen(`${x.w} turns into ${y.w}!`)}})};
 
 /* ----- 6. letter of the day ----- */
 STEPS.meet=(card,s)=>{const L=s.L,[kw,ke,tip]=KEYW[L];const snd=sn(LSND[L]);const big=L.length>1?L:`${L.toUpperCase()}<span>${L}</span>`;
   card.innerHTML=`<div class="mode">Letter of the day</div><div class="big-letter" aria-label="Letter ${esc(L)}">${big}</div>
    <div class="row ctr"><span class="hero-pic">${ke}</span><b style="font-family:var(--f-read);font-size:34px">${esc(kw)}</b></div>
-   ${bubble(L.length>1?`<b>${L}</b> is two letters that make one sound.`:`This is <b>${L}</b>. Its name is “${L}” and it says <b>/${esc(LSND[L])}/</b>.`)}
+   ${bubble(L.length>1?`<b>${L}</b> is two letters that make one sound.`:`This is <b>${L}</b>. Its name is “${L}” and it says <b>${esc(phl(LSND[L]))}</b>.`)}
    <div class="tip">👄 ${esc(tip)}</div>
    <div class="row ctr"><button class="btn sky" id="hs">🔊 Sound</button>${L.length===1?`<button class="btn alt" id="hn">🔤 Name</button>`:""}<button class="btn alt" id="hk">${ke} ${esc(kw)}</button></div>
    <button class="btn big" id="go">Got it →</button>`;
@@ -273,7 +278,7 @@ STEPS.meet=(card,s)=>{const L=s.L,[kw,ke,tip]=KEYW[L];const snd=sn(LSND[L]);cons
 STEPS.letterQuiz=(card,s)=>{const n=LS.n;const known=ORDER.slice(0,n+1);const target=Math.random()<.5?ORDER[n]:pick(known);
   const pool=known.filter(l=>LSND[l]!==LSND[target]);while(pool.length<2)pool.push(pick(["m","s","t","b"].filter(l=>l!==target&&!pool.includes(l))));
   const items=shuffle([target,...shuffle(pool).slice(0,2)]).map(l=>({w:l,l,say:sn(LSND[l])}));
-  choice(card,{mode:"Letter sounds",text:`Which letter says <b>/${esc(LSND[target])}/</b>?`,items,nameThem:false,isRight:b=>b.l===target,optHTML:b=>`<span style="font-size:58px">${esc(b.l)}</span>`,
+  choice(card,{mode:"Letter sounds",text:`Which letter says <b>${esc(phl(LSND[target]))}</b>?`,items,nameThem:false,isRight:b=>b.l===target,optHTML:b=>`<span style="font-size:58px">${esc(b.l)}</span>`,
     prompt:()=>sayThen("Which letter says",120,sn(LSND[target]),250,sn(LSND[target])),after:async()=>{await sayThen(`${target.length>1?target.split("").join(" "):target} says`,sn(LSND[target]),`like ${KEYW[target][0]}.`)}})};
 
 
@@ -305,15 +310,15 @@ function wordTiles(d){return `<div class="readword">${d.ch.map((c,i)=>`<button c
 function wireTiles(card,d){const ls=[...card.querySelectorAll(".letter")];const lit=i=>ls.forEach((x,k)=>x.classList.toggle("lit",k===i));
   ls.forEach(b=>b.onclick=()=>{const i=+b.dataset.i;lit(i);sayThen(sn(chunkSnd(d.ch[i])),()=>lit(-1))});
   return async()=>{await sayParts(d.ch.map(c=>sn(chunkSnd(c))),{gap:260,rate:.8,on:lit});await speak1(d.w,.9)}}
-STEPS.read=(card,s)=>{const n=LS.n;const d=pickDec(n);LS.used.add(d.w);LS.lastRead=d;S.got["R:"+d.w]=1;
+STEPS.read=(card,s)=>{const n=LS.n;const d=pickDec(n);LS.used.add(d.w);LS.lastRead=d;const gotIt=()=>{S.got["R:"+d.w]=1};
   if(d.e){const pool=[...DEC.filter(x=>x.e),...pics(ONE)].filter(x=>x.e!==d.e&&x.w!==d.w);const items=shuffle([d,...shuffle(pool).slice(0,2)]);
-    choice(card,{mode:"Read it",text:`Tap each letter to hear its sound, then blend. Which picture is it?`,items,nameThem:false,isRight:b=>b===d,prompt:()=>sayThen("Read the word. Which picture is it?"),after:async()=>{await sayThen(d.w+"!")}});
+    choice(card,{mode:"Read it",text:`Tap each letter to hear its sound, then blend. Which picture is it?`,items,nameThem:false,isRight:b=>b===d,prompt:()=>sayThen("Read the word. Which picture is it?"),after:async()=>{gotIt();await sayThen(d.w+"!")}});
     card.querySelector(".bubble").insertAdjacentHTML("afterend",wordTiles(d)+`<button class="btn sky sm" id="blend">🐸 Blend it with Pip</button>`);
     const bl=wireTiles(card,d);card.querySelector("#blend").onclick=bl}
   else{const pool=decodableAt(n).filter(x=>x.w!==d.w&&x.ch.length===d.ch.length);const near=pool.filter(x=>x.ch.filter((c,i)=>c===d.ch[i]).length>=d.ch.length-1);
     const opts=shuffle([d,...shuffle(near.length>=2?near:pool).slice(0,2)]);
     choice(card,{mode:"Read it",text:`Pip says a word. Read the words and tap the one Pip said.`,items:opts.map(x=>({...x,say:x.w})),nameThem:false,isRight:b=>b.w===d.w,
-      optHTML:b=>`<span style="font-size:clamp(24px,7.5vw,44px)">${esc(b.w)}</span>`,prompt:()=>sayThen("Find the word",200,d.w),after:async()=>{await sayThen(d.w+"!")}})}};
+      optHTML:b=>`<span style="font-size:clamp(24px,7.5vw,44px)">${esc(b.w)}</span>`,prompt:()=>sayThen("Find the word",200,d.w),after:async()=>{gotIt();await sayThen(d.w+"!")}})}};
 
 /* ----- 8. spelling with sound boxes ----- */
 STEPS.spell=(card,s)=>{const n=LS.n;const d=LS.lastRead&&LS.lastRead.ch.length<=4&&Math.random()<.4?LS.lastRead:pickDec(n,x=>x.ch.length<=4);LS.used.add(d.w);LS.lastSpell=d;
@@ -334,19 +339,27 @@ STEPS.spell=(card,s)=>{const n=LS.n;const d=LS.lastRead&&LS.lastRead.ch.length<=
 /* ----- 9. writing (trace pad) ----- */
 STEPS.trace=(card,s)=>traceStep(card,s.text,s.label);
 STEPS.write=(card,s)=>{const d=LS.lastSpell||pickDec(LS.n);traceStep(card,d.w,"Write the word",d)};
+/* Split a word so each part fits the pad with letters at least ~44px per line-gap (long words and names). */
+function traceParts(text,width){const maxW=Math.max(2.2,(width-40)/44-.4);const out=[];
+  for(const w of text.split(" ").filter(Boolean)){let cur="";for(const ch of w){const t=cur+ch;if(cur&&layoutText(t).w>maxW){out.push(cur);cur=ch}else cur=t}if(cur)out.push(cur)}
+  return out.length?out:[text]}
 function traceStep(card,text,label,word){
   card.innerHTML=`<div class="mode">${esc(label)}</div>${bubble(word?`Write <b>${esc(text)}</b>${word.e?" "+word.e:""}. Watch Pip first, then trace it.`:`Watch Pip write <b>${esc(text)}</b>. Then it's your turn!`)}
-   <div class="padwrap" id="pw"></div><div class="feedback" aria-live="polite">Watch…</div>
+   <div class="mode" id="partOf" hidden></div><div class="padwrap" id="pw"></div><div class="feedback" aria-live="polite">Watch…</div>
    <div class="row ctr"><button class="btn alt sm" id="watch">👀 Watch again</button><button class="btn alt sm" id="redo">🧽 Start over</button><button class="btn alt sm" id="skip">Skip ⏭</button></div>`;
-  const fb=card.querySelector(".feedback");let phase="demo";
-  const go=(mode)=>{phase=mode;if(pad)pad.kill();pad=new TracePad(card.querySelector("#pw"),text,mode,done);pad.setFb(fb)};
-  function done(oops){LS.oops+=oops;if(phase==="trace"){sfx.good();fb.textContent="Now on your own! Start at the green dot.";fb.className="feedback good";say("Now write it on your own.");setTimeout(()=>card.isConnected&&go("solo"),900)}
-    else if(phase==="solo"){sfx.good();fb.textContent=pick(["Beautiful writing!","You wrote it!","Great job writing!"]);fb.className="feedback good";mood(card.querySelector(".bubble .frog"),"happy");if(!LS.custom||LS.abc)S.got["W:"+text]=1;save();confetti(40);setTimeout(()=>card.isConnected&&next(),1100)}
+  const fb=card.querySelector(".feedback");const parts=traceParts(text,card.querySelector("#pw").clientWidth||320);let part=0,phase="demo";
+  const go=(mode)=>{phase=mode;if(pad)pad.kill();const po=card.querySelector("#partOf");po.hidden=parts.length<2;po.textContent=`Part ${part+1} of ${parts.length}: ${parts[part]}`;
+    pad=new TracePad(card.querySelector("#pw"),parts[part],mode,done);pad.setFb(fb)};
+  function done(oops){LS.oops+=oops;
+    if(phase==="trace"){sfx.good();fb.textContent="Now on your own! Start at the green dot.";fb.className="feedback good";say("Now write it on your own.");setTimeout(()=>card.isConnected&&go("solo"),900)}
+    else if(phase==="solo"){sfx.good();
+      if(part<parts.length-1){part++;fb.textContent="Next part!";fb.className="feedback good";setTimeout(()=>card.isConnected&&go("demo"),700);return}
+      fb.textContent=pick(["Beautiful writing!","You wrote it!","Great job writing!"]);fb.className="feedback good";mood(card.querySelector(".bubble .frog"),"happy");if(!LS.custom||LS.abc)S.got["W:"+text]=1;save();confetti(40);setTimeout(()=>card.isConnected&&next(),1100)}
     else{fb.textContent="Your turn! Start at the green dot and follow the arrow.";fb.className="feedback";go("trace")}}
   card.querySelector("#watch").onclick=()=>go("demo");card.querySelector("#redo").onclick=()=>go(phase==="demo"?"trace":phase);
   card.querySelector("#skip").onclick=()=>{LS.oops+=3;next()};
   requestAnimationFrame(()=>go("demo"));
-  if(text.length===1||text==="Qu"||ORDER.includes(text))say(text.length===1?`Watch me write ${/[A-Z]/.test(text)?"capital ":"little "}${text.toLowerCase()==="a"?"ay":text.toLowerCase()}.`:`Watch me write ${text}.`);else say(`Watch me write ${text}.`)}
+  if(text.length===1||text==="Qu")say(`Watch me write ${/[A-Z]/.test(text)?"capital ":"little "}${text.toLowerCase()==="a"?"ay":text.toLowerCase()}.`);else say(`Watch me write ${text}.`)}
 
 /* ----- 10. stories ----- */
 STEPS.cover=(card,s)=>{const st=s.s;card.innerHTML=`<div class="mode">Story time</div><div class="scene">${st.e}🐸</div><h2 style="font-size:clamp(30px,7vw,44px);font-family:var(--f-read)">${esc(st.t)}</h2>
@@ -372,7 +385,7 @@ function TracePad(host,text,mode,onDone){
   const pen=PENS[S.eq.pen]||PENS.blue;const dark=document.documentElement.dataset.theme==="dark"||(!document.documentElement.dataset.theme&&matchMedia("(prefers-color-scheme: dark)").matches);
   const P=p=>[ox+p[0]*U,oy+p[1]*U];
   function geom(){W=host.clientWidth||320;const rows=L.desc?3.5:2.8;U=Math.min((W-40)/(L.w+.4),190/rows*1.0,90);U=Math.max(U,24);H=Math.round(U*(L.desc?3.9:3.2)+20);ox=(W-L.w*U)/2;oy=U*.55+6;
-    const dpr=Math.min(2,devicePixelRatio||1);cv.width=W*dpr;cv.height=H*dpr;cv.style.height=H+"px";ctx.setTransform(dpr,0,0,dpr,0,0)}
+    const dpr=Math.min(2,devicePixelRatio||1);cv.width=W*dpr;cv.height=H*dpr;cv.style.height=H+"px";ctx.setTransform(dpr,0,0,dpr,0,0);PX=strokes.map(s=>s.pts.map(P))}
   function ink(t=0){if(pen.rainbow)return `hsl(${(t*30)%360} 85% ${dark?65:48}%)`;return dark?pen.d:pen.c}
   function line(y,dash,c,w){ctx.save();ctx.strokeStyle=c;ctx.lineWidth=w;ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(8,y);ctx.lineTo(W-8,y);ctx.stroke();ctx.restore()}
   function poly(pts,w,color){if(pts.length<2)return;ctx.lineCap="round";ctx.lineJoin="round";ctx.lineWidth=w;
@@ -395,18 +408,21 @@ function TracePad(host,text,mode,onDone){
       await new Promise(res=>{const t0=performance.now();const per=Math.max(500,s.pts.length*22);(function f(now){if(dead)return res();st.i=Math.min(s.pts.length-1,Math.floor((now-t0)/per*s.pts.length));draw();if(st.i>=s.pts.length-1)return res();requestAnimationFrame(f)})(t0)});
       await sleep(220)}
     st={s:strokes.length,i:0};draw();await sleep(500);if(!dead){demoOn=false;onDone(0)}}
-  const tol=()=>Math.max(22,U*(mode==="solo"?.5:.42));
+  /* rules in src/logic/trace.ts (tested): wide band, wobbles and lifts are fine, 85% of a stroke counts */
+  let PX=[];
+  const tol=()=>tolerance(S.set.trace||"normal",U,mode==="solo");const look=()=>lookPoints(U,.04*U);
   function local(e){const r=cv.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
-  const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
-  let drawing=false;
-  function onDown(e){if(demoOn||st.s>=strokes.length)return;e.preventDefault();const p=local(e);const s=strokes[st.s];
-    if(dist(p,P(s.pts[st.i]))<tol()*1.25){if(s.dot){finishStroke();return}drawing=true;user=[p];try{cv.setPointerCapture(e.pointerId)}catch(_){}}
-    else{oops++;fbt("Start at the green dot!","bad");sfx.bad();ring(P(s.pts[st.i]))}}
-  function onMove(e){if(!drawing)return;e.preventDefault();const p=local(e);user.push(p);const s=strokes[st.s];let best=-1;
-    for(let j=st.i+1;j<Math.min(s.pts.length,st.i+14);j++){if(dist(p,P(s.pts[j]))<tol())best=j}
-    if(best>0){st.i=best;offWarn=false}else{let near=1e9;for(let j=Math.max(0,st.i-3);j<Math.min(s.pts.length,st.i+20);j++)near=Math.min(near,dist(p,P(s.pts[j])));if(near>tol()*2.2&&!offWarn){offWarn=true;oops++;fbt("Stay on the path. Go back to the dot!","bad")}}
-    if(st.i>=s.pts.length-2){st.i=s.pts.length-1;finishStroke();return}draw()}
-  function onUp(){if(!drawing)return;drawing=false;user=[];draw()}
+  let drawing=false,warned=-1;
+  function onDown(e){if(demoOn||st.s>=strokes.length)return;e.preventDefault();const p=local(e);const s=strokes[st.s],sp=PX[st.s];
+    if(s.dot){if(dist(p,sp[0])<tol()*1.6)finishStroke();else{fbt("Tap the dot!","");ring(sp[0])}return}
+    const r=resumeAt(sp,st.i,p,tol(),look());
+    if(r>=0){st.i=r;drawing=true;user=[p];try{cv.setPointerCapture(e.pointerId)}catch(_){}draw()}
+    else{fbt(st.i>0?"Keep going from the green dot!":"Start at the green dot!","");ring(sp[st.i])}}
+  function onMove(e){if(!drawing)return;e.preventDefault();const p=local(e);user.push(p);const sp=PX[st.s];
+    st.i=advance(sp,st.i,p,tol(),look());
+    if(farOff(sp,st.i,p,tol(),look())){if(warned!==st.s){warned=st.s;oops++;fbt("Stay close to the line. Go back to the green dot!","bad")}}
+    if(st.i>=sp.length-2){st.i=sp.length-1;finishStroke();return}draw()}
+  function onUp(){if(!drawing)return;drawing=false;user=[];if(strokeDone(PX[st.s],st.i)){st.i=PX[st.s].length-1;finishStroke();return}draw()}
   function finishStroke(){drawing=false;user=[];sfx.pop();st.s++;st.i=0;if(st.s>=strokes.length){draw();fbt("Done!","good");setTimeout(()=>!dead&&onDone(oops),250);return}
     const nx=strokes[st.s];fbt(nx.dot?"Now tap the dot!":`Line ${st.s+1}: start at the green dot.`,"good");draw()}
   function ring(p){if(REDUCED)return;const t0=performance.now();(function f(now){if(dead)return;const k=(now-t0)/600;draw();if(k>=1)return;ctx.save();ctx.strokeStyle="#12C38E";ctx.lineWidth=4;ctx.globalAlpha=1-k;ctx.beginPath();ctx.arc(p[0],p[1],12+k*36,0,7);ctx.stroke();ctx.restore();requestAnimationFrame(f)})(t0)}
@@ -425,7 +441,7 @@ function giftHTML(g){if(!g)return `<p class="hint">Every 3rd lesson hides a surp
   const set=CATS.find(c=>c[0]===g[0])[2],it=set[g[1]];
   const prev=g[0]==="frog"?frogSVG(FROGS[g[1]],S.eq.hat):g[0]==="hat"?frogSVG(undefined,g[1]):(it.e||(g[0]==="pen"?"🖍️":"🎁"));
   return `<div class="gift"><div class="prev">${prev}</div><div>Surprise gift! Pip found <b>${esc(it.n)}</b>. Try it on in the Closet.</div></div>`}
-function finish(){killPad();const n=LS.n;const pen=LS.miss+Math.floor(LS.oops/2);const stars=pen<=1?3:pen<=4?2:1;
+function finish(){killPad();const n=LS.n;const pen=LS.miss+Math.min(2,Math.floor(LS.oops/2));const stars=pen<=1?3:pen<=4?2:1;
   S.done[n]=true;S.stars[n]=Math.max(S.stars[n]||0,stars);const coins=10+stars*5;S.coins+=coins;const newPals=grantPals();const gift=grantGift();save();renderHUD();
   const nextOpen=n+1<LESSONS;show("reward");
   $("#reward").innerHTML=`<div class="card reward"><h2>${pick(["Lesson done!","You hopped the whole pond!","Ribbit! You did it!"])}</h2>
@@ -472,8 +488,9 @@ function renderGames(){const d=doneCount();
 function startGame(id){stopGame();GS={id,dead:false,raf:0,timers:[],score:0};show("game");$("#gtitle").textContent=GAMES[id].e+" "+GAMES[id].n;$("#gquit").onclick=()=>{stopGame();show("games")};
   ({rhyme:gameRhyme,fly:gameFly,hop:gameHop,match:gameMatch})[id]($("#gstage"))}
 function arenaHTML(){return `<div class="arena" id="arena" style="background:${W().bg}"><div class="ghud" id="ghud"></div></div>`}
-function gameOver(stage,text){const g=GS;if(!g)return;const coins=Math.min(15,g.score);S.coins+=coins;S.games[g.id]=Math.max(S.games[g.id]||0,g.score);save();renderHUD();stopGame();
-  stage.innerHTML=`<div class="card reward"><h2>${esc(text)}</h2><div class="stage-duo dance">${frogSVG()}${buddySVG()}</div><div class="coinsup">+${coins} coins</div>
+const today=()=>new Date().toISOString().slice(0,10);
+function gameOver(stage,text){const g=GS;if(!g)return;if(S.gameDay?.d!==today())S.gameDay={d:today(),n:0};const paid=S.gameDay.n<3;S.gameDay.n++;const coins=paid?Math.min(15,g.score):0;S.coins+=coins;S.games[g.id]=Math.max(S.games[g.id]||0,g.score);save();renderHUD();stopGame();
+  stage.innerHTML=`<div class="card reward"><h2>${esc(text)}</h2><div class="stage-duo dance">${frogSVG()}${buddySVG()}</div><div class="coinsup">${paid?`+${coins} coins`:"Just for fun now: game coins come back tomorrow. Lessons still give coins!"}</div>
    <div class="row ctr"><button class="btn big" id="again">▶ Play again</button><button class="btn alt" id="back">🎮 Games</button><button class="btn alt" id="mp">🗺️ Map</button></div></div>`;
   sfx.win();celebrate();$("#again").onclick=()=>startGame(g.id);$("#back").onclick=()=>show("games");$("#mp").onclick=()=>show("map")}
 const taughtLetters=()=>{const n=Math.max(5,doneCount());return ORDER.slice(0,Math.min(LESSONS,n+1)).filter(l=>l.length===1)};
@@ -649,6 +666,7 @@ function renderGrown(){const host=$("#grownBody");if(!gateOK){gateN=200+Math.flo
 
     <label>Voice speed<select id="setRate"><option value="0.8">Slower</option><option value="1">Normal</option><option value="1.15">Faster</option></select></label>
     ${hasClaudeTTS()?`<label>Voice<select id="setVoice"><option value="device">This device's voice (fastest)</option><option value="claude">Claude voice</option></select></label>`:""}
+    <label>Tracing help<select id="setTrace"><option value="extra">Extra easy (close is fine)</option><option value="normal">Easy</option><option value="tidy">Tidy (stay near the line)</option></select></label>
     <label>Trace capital letters too<input type="checkbox" id="setCaps" ${st.caps!==false?"checked":""} style="width:26px;height:26px"></label>
     <label>Calmer celebrations<input type="checkbox" id="setCalm" ${st.calm?"checked":""} style="width:26px;height:26px"></label>
     <label>Open lessons up to<select id="setJump">${ORDER.map((l,i)=>`<option value="${i}">Lesson ${i+1}: ${esc(l)}</option>`).join("")}</select></label>
@@ -662,10 +680,11 @@ function renderGrown(){const host=$("#grownBody");if(!gateOK){gateN=200+Math.flo
    <div class="card" style="justify-items:start"><h2>Start over</h2><p class="hint">Erases all lessons, coins, pals and saved words on this device.</p><button class="btn berry" id="resetBtn">Erase progress…</button></div></div>`;
   $("#setRate").value=String(st.rate||1);$("#setRate").onchange=e=>{S.set.rate=+e.target.value;save();say("This is how fast I talk.")};
   if($("#setVoice")){$("#setVoice").value=st.voice;$("#setVoice").onchange=e=>{S.set.voice=e.target.value;save();say("Hi! I'm Pip.")}}
+  $("#setTrace").value=st.trace||"normal";$("#setTrace").onchange=e=>{S.set.trace=e.target.value;save()};
   $("#setCaps").onchange=e=>{S.set.caps=e.target.checked;save()};$("#setCalm").onchange=e=>{S.set.calm=e.target.checked;save()};
   $("#setJump").value=String(Math.max(openUpTo(),S.set.jump||0));$("#setJump").onchange=e=>{S.set.jump=Math.max(S.set.jump||0,+e.target.value);save();toast(`Lessons 1 to ${S.set.jump+1} are open.`)};
   $("#resetBtn").onclick=()=>{const d=document.createElement("div");d.className="confirm";d.innerHTML=`<div class="card" role="dialog" aria-label="Erase progress"><h2>Erase everything?</h2><p class="hint">This can't be undone.</p><div class="row ctr"><button class="btn alt" id="no">Keep it</button><button class="btn berry" id="yes">Erase</button></div></div>`;
-    document.body.appendChild(d);d.querySelector("#no").onclick=()=>d.remove();d.querySelector("#yes").onclick=()=>{d.remove();S=fresh();save();bdNow="";renderBackdrop();toast("Progress erased.");show("map")}}}
+    document.body.appendChild(d);d.querySelector("#no").onclick=()=>d.remove();d.querySelector("#yes").onclick=()=>{d.remove();eraseAll();S=fresh();base=fresh();save();bdNow="";renderBackdrop();toast("Progress erased.");show("map")}}}
 /* ===================== VOICE NOTE ===================== */
 function voiceHelp(){const ua=navigator.userAgent;
   if(/iPad|iPhone/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1))return "On iPad or iPhone: Settings → Accessibility → Spoken Content → Voices → English, then download a voice.";
@@ -679,13 +698,16 @@ function renderVoiceNote(){const el=$("#voiceNote");if(!el)return;const none=voi
 /* ===================== BOOT ===================== */
 export async function boot(){
   await restoreFromApp();S=loadState();base=structuredClone(S);
+  if(needsRewrite())save();
   document.querySelectorAll("header [data-go]").forEach(b=>b.onclick=()=>{stopSay();show(b.dataset.go)});
   $("#abcBtn").onclick=()=>show("abc");$("#worldsBtn").onclick=()=>show("worlds");$("#quit").onclick=()=>leaveLesson();
   $("#muteBtn").onclick=()=>{S.mute=!S.mute;save();if(S.mute)stopSay();renderHUD()};
   addEventListener("pointerdown",unlockSpeech,{once:true,capture:true});
   onOtherTabSave(()=>{if(current==="lesson"||current==="game")return;S=loadState();base=structuredClone(S);bdNow="";renderBackdrop();show(current,{push:false})});
   onAndroidBack(()=>current==="map",goBack);
-  const cl=window.claude;
+  /* Claude-only: the microphone (dictation) and Claude's voice. __ARTIFACT__ is false in the website and app
+     builds, so this code is removed from them entirely (store builds must never contain a microphone path). */
+  const cl=__ARTIFACT__?window.claude:null;
   if(cl&&cl.use){cl.use("tts").then(t=>{if(t){setClaudeTTS(t);if(current==="grown")renderGrown();renderVoiceNote()}}).catch(()=>{});
     cl.use("dictation").then(d=>{if(d)wireDictation(d)}).catch(()=>{})}
   renderBackdrop();

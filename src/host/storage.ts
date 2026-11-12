@@ -26,4 +26,18 @@ export async function restoreFromApp(): Promise<void> {
     if (value && !localStorage.getItem(KEY)) localStorage.setItem(KEY, value);
   } catch { /* none */ }
 }
+/** Erase every copy of progress on this device (Grown-ups → Erase). */
+export function eraseAll(): void {
+  try { for (const k of [KEY, BACKUP_KEY, ...OLD_KEYS]) localStorage.removeItem(k); } catch { /* none */ }
+  if (native) Preferences.remove({ key: KEY }).catch(() => undefined);
+}
+/** An older save (old key, or one that still holds a name) should be rewritten in the current, cleaned shape. */
+export function needsRewrite(): boolean {
+  try {
+    const cur = localStorage.getItem(KEY);
+    const old = OLD_KEYS.some(k => localStorage.getItem(k) !== null);
+    if (old) { for (const k of OLD_KEYS) localStorage.removeItem(k); }
+    return old || (!!cur && /"name"\s*:|"theme"\s*:/.test(cur));
+  } catch { return false; }
+}
 export function onOtherTabSave(fn: () => void): void { addEventListener('storage', e => { if (e.key === KEY) fn(); }); }
