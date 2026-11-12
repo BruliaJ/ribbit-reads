@@ -1,8 +1,9 @@
+import { hatSVG } from "./hats";
 /* ===================== PALS — mermaids, trucks and dragons =====================
    Every pal is drawn in a 120×120 box standing on y≈112. `hat` is where a hat sits (x, y, scale). */
 const SKN={a:"#FFDCC2",b:"#F2C29B",c:"#D79A6B",d:"#A86B44",e:"#7A4B2E"};
 const PK=(n,sp,o)=>Object.assign({n,sp},o);
-const ROSTER={
+export const ROSTER={
  flower:[PK("Sunny","flower",{kind:"sun",pet:"#FFC531",mid:"#C98B4E",pot:"#E2674E"}),PK("Daisy","flower",{kind:"round",pet:"#FFFFFF",mid:"#FFD23F",pot:"#3E8EF0"}),PK("Tulip","flower",{kind:"tulip",pet:"#FF5A7A",mid:"#FFD9E0",pot:"#FFB81F"}),
   PK("Violet","flower",{kind:"round",pet:"#9B6BFF",mid:"#FFE27A",pot:"#12A386"}),PK("Rosie","flower",{kind:"tulip",pet:"#E8352E",mid:"#FFD6D6",pot:"#8E6BD8"}),PK("Poppy","flower",{kind:"point",pet:"#FF6B3D",mid:"#FFE3B3",pot:"#3E8EF0"}),
   PK("Bluebell","flower",{kind:"point",pet:"#5CA8FF",mid:"#FFF1CC",pot:"#FF8FC4"}),PK("Petal","flower",{kind:"round",pet:"#FF9EC7",mid:"#FFE27A",pot:"#5CC98F"}),PK("Clover","flower",{kind:"clover",pet:"#5CC98F",mid:"#D7FFE3",pot:"#C8743A"}),
@@ -87,4 +88,4 @@ function palCore(p,hat){const draw={mermaid:mermaidSVG,dragon:dragonSVG,truck:tr
   if(p.sp==="truck"&&(p.kind==="icecream"))hp=[60,-6,.5];if(p.sp==="truck"&&p.kind==="fire")hp=[60,20,.55];
   const hs=hat&&hat!=="none"?`<g transform="translate(${hp[0]-56*hp[2]} ${hp[1]-18*hp[2]}) scale(${hp[2]})">${hatSVG(hat)}</g>`:"";
   return `<ellipse cx="60" cy="113" rx="40" ry="5" fill="rgba(0,0,0,.13)"/><g class="sb">${draw}${hs}</g>`}
-function palSVG(p,hat="none",cls=""){return `<svg class="snail pal ${cls}" viewBox="0 -14 120 132" aria-hidden="true">${palCore(p,hat)}</svg>`}
+export function palSVG(p,hat="none",cls=""){return `<svg class="snail pal ${cls}" viewBox="0 -14 120 132" aria-hidden="true">${palCore(p,hat)}</svg>`}

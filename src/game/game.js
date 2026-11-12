@@ -1,68 +1,40 @@
+/* The game screens. Pure rules live in src/logic (tested); platform differences in src/host. */
+import { SND, VOW, ORDER, LESSONS, KEYW, LSND, DEC_PIC, HEART, STORIES, PONDS, CAPSENT } from '../content/data';
+import { glyph, layoutText } from '../content/glyphs';
+import { FROGS, HATS, THEMES, PENS, PARTIES, CATS, GIFT_ORDER } from '../content/shop';
+import { sn, ONE, MULTI, pics, rimeOf, onsetOf, rimeText, RHY, chunks, chunkSnd, DEC, letterSet, decodableAt, ADDP, SUBP, ABC, confusers, capWrong } from '../logic/phonics';
+import { planLesson, skillsFor } from '../logic/plan';
+import { parseAsk, cleanWord, capName } from '../logic/ask';
+import { fresh, parseSave, mergeSaves } from '../logic/state';
+import { speakOnce, stopSpeech, unlockSpeech, voiceStatus, setClaudeTTS, hasClaudeTTS } from '../host/speech';
+import { readRaw, writeRaw, backup, restoreFromApp, onOtherTabSave } from '../host/storage';
+import { isApp, onAndroidBack } from '../host/app';
+import { ROSTER, palSVG } from './pals';
+import { hatSVG } from './hats';
+
 /* ===================== HELPERS ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const pick=a=>a[Math.random()*a.length|0];
+const rand=(a,b)=>a+Math.random()*(b-a);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const REDUCED=matchMedia("(prefers-reduced-motion: reduce)").matches;
 const PRAISE=["You heard it!","Great listening!","You kept at it!","Yes! You worked it out!","Nice hopping!","Good ears!","You did it!"];
 
-/* ===================== SKINS ===================== */
-const FROGS={
- lime:{n:"Lily green",price:0,a:"#8EDB6E",b:"#3E9B3A",belly:"#EAF8C4",ch:"#FF9BB0"},
- pink:{n:"Bubblegum",price:30,a:"#FFAED2",b:"#E0518F",belly:"#FFE8F2",ch:"#FF5A8A"},
- blue:{n:"Blue raspberry",price:30,a:"#8FD0FF",b:"#2E7FD0",belly:"#E6F5FF",ch:"#FF9BB0"},
- sunset:{n:"Sunset",price:45,a:"#FFC94F",b:"#F0612E",belly:"#FFF3CF",ch:"#FF6B6B"},
- grape:{n:"Grape",price:45,a:"#BE9BFF",b:"#6B3FD8",belly:"#F1E9FF",ch:"#FF8FC4"},
- galaxy:{n:"Galaxy",price:70,a:"#6A5FE8",b:"#1D1453",belly:"#C2BCFF",ch:"#FF8FC4",stars:1},
- rainbow:{n:"Rainbow",price:80,a:"#FF6B6B",b:"#7A5AF8",belly:"#FFFFFF",ch:"#FF8FC4",rainbow:1},
- gold:{n:"Golden",price:100,a:"#FFEA8F",b:"#D49A00",belly:"#FFF9DC",ch:"#FF9BB0",shine:1}};
-const HATS={none:{n:"No hat",price:0},bow:{n:"Big bow",price:20},flower:{n:"Daisy",price:20},party:{n:"Party hat",price:25},cowboy:{n:"Cowboy hat",price:35},crown:{n:"Crown",price:40},wizard:{n:"Wizard hat",price:45}};
-const THEMES={
- lily:{n:"Lily pond",price:0,e:"🪷",bg:"linear-gradient(180deg,#CFEFFF 0%,#E6F8F0 45%,#A6DFC9 100%)",hill:["#7FCF9A","#4FAE74"],parts:i=>i%3?`<div class="amb drift" style="top:${50+(i*11)%40}vh;font-size:${26+(i*7)%20}px;animation-duration:${36+(i*7)%30}s;animation-delay:-${(i*6)%40}s">🪷</div>`:`<div class="amb flyb" style="left:${(i*29)%90}vw;top:${10+(i*13)%40}vh;font-size:26px;animation-delay:-${i}s">🐞</div>`},
- candy:{n:"Candy creek",price:35,e:"🍭",bg:"linear-gradient(180deg,#FFE0F0 0%,#FFF3F8 50%,#FFC9DF 100%)",hill:["#FF9EC7","#F06FA8"],parts:i=>`<div class="amb fall" style="left:${(i*37)%100}vw;font-size:${18+(i*5)%14}px;animation-duration:${9+(i*3)%8}s;animation-delay:-${(i*1.3)%10}s">${["🍬","🍭","🧁","🍓"][i%4]}</div>`},
- moon:{n:"Moonlight",price:45,e:"🌙",bg:"linear-gradient(180deg,#1C2456 0%,#33408F 60%,#5B67B8 100%)",hill:["#2C3A7A","#1B2557"],parts:i=>`<div class="amb tw ffly" style="left:${(i*41)%100}vw;top:${(i*23)%75}vh;animation-delay:-${(i*.7)%2}s"></div>`},
- jungle:{n:"Jungle",price:45,e:"🦜",bg:"linear-gradient(180deg,#C9F2C2 0%,#EAF9DF 50%,#8CCB6E 100%)",hill:["#5BAA47","#3C8A2E"],parts:i=>i%4?`<div class="amb fall" style="left:${(i*37)%100}vw;font-size:${18+(i*5)%14}px;animation-duration:${10+(i*3)%8}s;animation-delay:-${(i*1.3)%10}s">🍃</div>`:`<div class="amb drift" style="top:${8+(i*7)%30}vh;font-size:34px;animation-duration:${18+i}s;animation-delay:-${i*2}s">🦜</div>`},
- snow:{n:"Snow day",price:55,e:"❄️",bg:"linear-gradient(180deg,#C7DDFF 0%,#EEF5FF 55%,#FFFFFF 100%)",hill:["#FFFFFF","#DDEBFF"],parts:i=>`<div class="amb fall" style="left:${(i*37)%100}vw;font-size:${12+(i*5)%16}px;color:#fff;text-shadow:0 0 4px #8FB4E8;animation-duration:${9+(i*3)%8}s;animation-delay:-${(i*1.1)%10}s">❄</div>`},
- space:{n:"Outer space",price:70,e:"🪐",bg:"linear-gradient(180deg,#0E1033 0%,#251E5C 60%,#3E2E85 100%)",hill:["#4A3C99","#2B2366"],parts:i=>i%5?`<div class="amb tw" style="left:${(i*41)%100}vw;top:${(i*23)%80}vh;font-size:${8+(i*5)%12}px;color:#FFF6B0;animation-delay:-${(i*.7)%2}s">✦</div>`:`<div class="amb drift" style="top:${10+(i*9)%40}vh;font-size:40px;animation-duration:${30+i}s;animation-delay:-${i*3}s">${i%2?"🪐":"🛸"}</div>`}};
-const PENS={
- blue:{n:"Pond blue",price:0,c:"#1F5FBF",d:"#9CC8FF"},
- leaf:{n:"Leaf green",price:20,c:"#1F8A44",d:"#7FE3A3"},
- berry:{n:"Berry pink",price:25,c:"#D12B6E",d:"#FF8CC0"},
- grape:{n:"Grape",price:25,c:"#6B3FD8",d:"#C4A8FF"},
- neon:{n:"Glow slime",price:40,c:"#0FAE5C",d:"#3DFF95",glow:1},
- rainbow:{n:"Rainbow",price:60,rainbow:1},
- gold:{n:"Gold glitter",price:70,c:"#B98000",d:"#FFD54A",glow:1}};
-const PARTIES={
- confetti:{n:"Confetti",price:0,e:"🎊"},
- bubbles:{n:"Bubble storm",price:30,e:"🫧"},
- fireworks:{n:"Fireworks",price:45,e:"🎆"},
- chorus:{n:"Frog choir",price:60,e:"🎶"},
- parade:{n:"Pal parade",price:60,e:"🎈"}};
-const CATS=[["frog","Pip's colors",FROGS],["hat","Hats",HATS],["theme","Ponds",THEMES],["pen","Pens",PENS],["party","Celebrations",PARTIES]];
-/* surprise gifts come in this order, one every 3rd lesson (never random) */
-const GIFT_ORDER=[["hat","bow"],["pen","leaf"],["frog","blue"],["party","bubbles"],["hat","party"],["theme","candy"],["pen","berry"],["frog","pink"],["hat","flower"],["party","fireworks"]];
-
 /* ===================== STATE ===================== */
-const KEY="ribbitreads.v1";
-try{if(!localStorage.getItem(KEY)&&localStorage.getItem("soundhop.v1"))localStorage.setItem(KEY,localStorage.getItem("soundhop.v1"))}catch(e){}
-const fresh=()=>({v:1,name:"",coins:20,stars:{},done:{},plays:0,gifts:0,own:{frog:["lime"],hat:["none"],theme:["lily"],pen:["blue"],party:["confetti"]},eq:{frog:"lime",hat:"none",theme:"lily",pen:"blue",party:"confetti"},
-  got:{},world:"flower",unl:{},buddy:{},mine:[],games:{},mute:false,set:{rate:1,voice:"device",calm:false,caps:true}});
-function loadState(){let raw=null;try{raw=JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){}
-  const f=fresh();if(!raw||typeof raw!=="object")return f;const s=Object.assign(f,raw);
-  ["stars","done","got","unl","buddy","games"].forEach(k=>{if(!s[k]||typeof s[k]!=="object")s[k]={}});
-  s.own=Object.assign(fresh().own,s.own||{});s.eq=Object.assign(fresh().eq,s.eq||{});s.set=Object.assign(fresh().set,s.set||{});
-  CATS.forEach(([c,,set])=>{if(!Array.isArray(s.own[c]))s.own[c]=[Object.keys(set)[0]];s.own[c]=s.own[c].filter(id=>set[id]);if(!s.own[c].length)s.own[c]=[Object.keys(set)[0]];if(!set[s.eq[c]]||!s.own[c].includes(s.eq[c]))s.eq[c]=s.own[c][0]});
-  if(!Array.isArray(s.mine))s.mine=[];s.coins=Math.max(0,+s.coins||0);return s}
-let S=loadState();
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+let S=fresh(),base=fresh();
+function loadState(){const raw=readRaw();const r=parseSave(raw);if(!r)return fresh();if(r.damaged&&raw)backup(raw);return r.save}
+/* save: if another tab saved since we loaded, keep what both earned (progress only grows) */
+function save(){const cur=parseSave(readRaw());let out=S;if(cur&&!cur.damaged&&cur.save.rev!==base.rev)out=mergeSaves(base,S,cur.save);
+  out.rev=Math.max(out.rev,cur&&!cur.damaged?cur.save.rev:0)+1;S=out;base=structuredClone(S);writeRaw(JSON.stringify(S))}
 const totalStars=()=>Object.values(S.stars).reduce((a,b)=>a+(+b||0),0);
-const doneCount=()=>Object.keys(S.done).filter(k=>/^\d+$/.test(k)).length;
+const doneCount=()=>Object.keys(S.done).length;
 const nextLesson=()=>{for(let i=0;i<LESSONS;i++)if(!S.done[i])return i;return LESSONS-1};
 const openUpTo=()=>{let m=0;for(let i=0;i<LESSONS;i++)if(S.done[i])m=i+1;return Math.min(LESSONS-1,Math.max(m,S.set.jump||0))};
 
 /* ===================== PALS (shared with Loopaloo) ===================== */
-const WORLDS=[
+export const WORLDS=[
  {id:"flower",name:"Flower Garden",ic:"🌷"},{id:"mermaid",name:"Mermaid Cove",ic:"🧜‍♀️"},{id:"truck",name:"Truck Town",ic:"🚚"},{id:"dragon",name:"Dragon Peaks",ic:"🐉"}];
 const STARTERS=3,PER=2;
 const Wd=()=>WORLDS.find(w=>w.id===S.world)||WORLDS[0];
@@ -107,17 +79,9 @@ let AC=null;function tone(f,d=.12,type="sine",v=.12,when=0){if(S.mute)return;try
 const sfx={good:()=>{tone(660,.12,"triangle");tone(990,.18,"triangle",.1,.1)},bad:()=>tone(200,.18,"sine",.08),pop:()=>tone(880,.06,"triangle",.08),
   hop:()=>{tone(420,.08,"sine",.1);tone(640,.1,"sine",.08,.06)},coin:()=>{tone(1200,.08,"square",.04);tone(1600,.12,"square",.04,.07)},
   win:()=>[523,659,784,1046].forEach((f,i)=>tone(f,.25,"triangle",.1,i*.12)),ribbit:()=>{tone(180,.09,"sawtooth",.06);tone(150,.12,"sawtooth",.06,.11)}};
-let voice=null;function pickVoice(){try{const v=speechSynthesis.getVoices();voice=v.find(x=>/en[-_]US/i.test(x.lang)&&/samantha|ava|allison|google us|female|zira|jenny|aria/i.test(x.name)&&!/online|natural/i.test(x.name))||v.find(x=>/en[-_]US/i.test(x.lang))||v.find(x=>/^en/i.test(x.lang))||null}catch(e){}}
-try{pickVoice();speechSynthesis.onvoiceschanged=pickVoice}catch(e){}
-const TT={cl:null};
 let sayId=0;
-function stopSay(){sayId++;try{speechSynthesis.cancel()}catch(e){}try{TT.cl&&TT.cl.stop()}catch(e){}}
-function speak1(text,rate=1){return new Promise(res=>{let done=false;const fin=()=>{if(!done){done=true;res()}};
-  if(S.mute||!text){setTimeout(fin,250);return}
-  const r=Math.max(.5,Math.min(1.5,rate*(S.set.rate||1)));
-  const dev=()=>{try{const u=new SpeechSynthesisUtterance(text);u.lang="en-US";if(voice)u.voice=voice;u.rate=r;u.pitch=1.12;u.onend=fin;u.onerror=fin;setTimeout(fin,700+text.length*95/r);speechSynthesis.speak(u)}catch(e){setTimeout(fin,400)}};
-  if(S.set.voice==="claude"&&TT.cl){TT.cl.speak(text,{rate:Math.max(.7,Math.min(1.5,r))}).then(fin,e=>{if(e&&e.code==="viewer_stopped")fin();else dev()});return}
-  dev()})}
+function stopSay(){sayId++;stopSpeech()}
+function speak1(text,rate=1){if(S.mute||!text)return sleep(200);return speakOnce(text,rate*(S.set.rate||1),S.set.voice==="claude")}
 async function say(text,rate){stopSay();const id=sayId;await speak1(text,rate);return id===sayId}
 /* say a list of pieces one by one; on(i) lights each piece; resolves false if interrupted */
 async function sayParts(parts,{gap=420,rate=.85,on,lead=""}={}){stopSay();const id=sayId;if(lead){await speak1(lead,1);if(id!==sayId)return false;await sleep(150)}
@@ -125,14 +89,32 @@ async function sayParts(parts,{gap=420,rate=.85,on,lead=""}={}){stopSay();const 
   on&&on(-1);return id===sayId}
 async function sayThen(...pieces){stopSay();const id=sayId;for(const p of pieces){if(id!==sayId)return false;if(typeof p==="number"){await sleep(p);continue}if(typeof p==="function"){p();continue}await speak1(p,1)}return id===sayId}
 
-/* ===================== NAV / HUD ===================== */
+/* ===================== NAVIGATION =====================
+   Every screen has its own #address, so the browser's Back (and Android's Back) returns to where the child was.
+   Leaving a lesson by ✕ or Back only pauses it: the pond shows "Keep going" at the same step. */
 const SECTIONS=["map","lesson","reward","games","game","closet","book","words","grown","abc"];
-function show(id){if(id!=="lesson"&&id!=="game"){killPad();stopGame&&stopGame()}
-  SECTIONS.forEach(s=>$("#"+s).hidden=s!==id);
-  document.querySelectorAll(".nav button").forEach(b=>b.setAttribute("aria-current",b.dataset.go===id?"true":"false"));scrollTo(0,0);
-  ({map:renderMap,abc:renderAbc,games:renderGames,closet:renderCloset,book:renderBook,words:renderWords,grown:renderGrown})[id]?.();renderHUD()}
+const ROUTE={map:"pond",abc:"abc",words:"words",games:"games",closet:"closet",book:"stickers",grown:"grownups",lesson:"lesson",reward:"done",game:"play"};
+const BYROUTE=Object.fromEntries(Object.entries(ROUTE).map(([k,v])=>[v,k]));
+let current="map",PAUSED=null;
+function show(id,{push=true}={}){
+  if(current==="lesson"&&id!=="lesson")pauseLesson();
+  if(id!=="lesson"&&id!=="game"){killPad();stopGame()}
+  current=id;SECTIONS.forEach(s=>$("#"+s).hidden=s!==id);
+  document.body.classList.toggle("focus",id==="lesson"||id==="game");
+  document.querySelectorAll("header [data-go]").forEach(b=>b.setAttribute("aria-current",b.dataset.go===id?"true":"false"));scrollTo(0,0);
+  ({map:renderMap,abc:renderAbc,games:renderGames,closet:renderCloset,book:renderBook,words:renderWords,grown:renderGrown})[id]?.();renderHUD();
+  const h="#"+ROUTE[id];if(push&&location.hash!==h){try{history.pushState(null,"",h)}catch(e){location.hash=h}}
+  const t=$("#"+id+" h1, #"+id+" h2");if(t&&push){t.setAttribute("tabindex","-1");t.focus({preventScroll:true})}}
+function route(){const id=BYROUTE[(location.hash||"#pond").slice(1)]||"map";
+  if(id===current)return;
+  if(id==="lesson"&&PAUSED){resumeLesson();return}
+  if(["lesson","reward","game"].includes(id)){show("map",{push:false});try{history.replaceState(null,"","#pond")}catch(e){}return}
+  show(id,{push:false})}
+addEventListener("popstate",route);addEventListener("hashchange",route);
+function goBack(){if(current==="map")return;if(history.length>1)history.back();else show("map")}
 function renderHUD(){$("#muteBtn").textContent=S.mute?"🔇":"🔊";$("#muteBtn").setAttribute("aria-pressed",S.mute?"true":"false");$("#starCount").textContent=totalStars();$("#coinCount").textContent=S.coins;$("#brandFrog").innerHTML=frogSVG()}
-function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2600)}
+function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2800)}
+
 let bdNow="";function renderBackdrop(){const th=THEMES[S.eq.theme]||THEMES.lily;if(bdNow===S.eq.theme)return;bdNow=S.eq.theme;const bd=$("#bd");
   bd.style.background=th.bg;bd.innerHTML=`<div class="hill" style="background:${th.hill[0]}"></div><div class="hill h2" style="background:${th.hill[1]}"></div>`+(REDUCED?"":Array.from({length:14},(_,i)=>th.parts(i)).join(""))}
 const STAR=on=>`<svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.6 1.3 6.5L12 17.2 6.1 20.4l1.3-6.5L2.5 9.3l6.6-.8z" fill="${on?"#FFC531":"var(--locked)"}" stroke="${on?"#C98500":"transparent"}" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
@@ -142,11 +124,12 @@ const COIN=`<svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx=
 const lname=i=>{const L=ORDER[i];return L.length>1?`“${L}”`:`${L.toUpperCase()}${L}`};
 function renderMap(){const n=nextLesson(),open=openUpTo(),L=ORDER[n],allDone=doneCount()>=LESSONS;
   $("#heroDuo").innerHTML=frogSVG(undefined,undefined,"bob")+buddySVG();
-  $("#heroHi").textContent=S.name?`Hi, ${S.name}! Pip is ready to hop.`:"Hop along with Pip: hear sounds, read words, write letters.";
+  $("#heroHi").textContent="Hop along with Pip: hear sounds, read words, write letters big and little.";
+  renderVoiceNote();
   $("#playCard").innerHTML=`<div class="mode">${allDone?"Every pad hopped!":`Lesson ${n+1} of ${LESSONS} · ${esc(PONDS[n/5|0].n)}`}</div>
    <div class="today"><div class="lotd" aria-label="Letter of the day">${L.length>1?L:L.toUpperCase()+L}</div><div style="text-align:left;display:grid;gap:4px"><b style="font-family:var(--f-display);font-size:22px">${allDone?"Play any lesson again":"Today's letter"}</b><span class="hint">${allDone?"Or make your own lesson in My Words.":`${esc(KEYW[L][1])} ${esc(KEYW[L][0])}: rhymes, sounds, reading and writing.`}</span></div></div>
-   <button class="btn big" id="playBtn">▶ Play!</button>`;
-  $("#playBtn").onclick=()=>startLesson(n);
+   ${PAUSED&&!PAUSED.custom?`<button class="btn big" id="resumeBtn">▶ Keep going</button><span class="hint">Lesson ${PAUSED.n+1}, step ${PAUSED.k+1} of ${PAUSED.steps.length}</span>`:`<button class="btn big" id="playBtn">▶ Play!</button>`}`;
+  if($("#resumeBtn"))$("#resumeBtn").onclick=resumeLesson;else $("#playBtn").onclick=()=>startLesson(n);
   $("#ponds").innerHTML=PONDS.map((p,pi)=>{const pads=[0,1,2,3,4].map(k=>{const i=pi*5+k;const st=S.stars[i]||0;const lock=i>open;
       return `<button class="pad ${lock?"lock":""} ${i===n&&!lock&&!S.done[i]?"next":""}" data-i="${i}" aria-label="Lesson ${i+1}, letter ${ORDER[i]}${lock?", locked":""}${st?`, ${st} stars`:""}">${lock?"🔒":esc(ORDER[i])}${k===4?`<span class="bk" aria-hidden="true">📖</span>`:""}${st?`<span class="st" aria-hidden="true">${"⭐".repeat(st)}</span>`:""}</button>`}).join("");
     const got=[0,1,2,3,4].filter(k=>S.done[pi*5+k]).length;
@@ -160,48 +143,23 @@ function renderPalPicker(host){const w=Wd();
   host.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{S.world=b.dataset.w;save();renderPalPicker(host);if(!$("#map").hidden)$("#heroDuo").innerHTML=frogSVG(undefined,undefined,"bob")+buddySVG()});
   host.querySelectorAll(".palbtn").forEach(b=>b.onclick=()=>{const i=+b.dataset.i;if(i>=unl(w)){sfx.bad();toast("Finish lessons to meet this pal!");return}S.buddy[w.id]=i;save();sfx.pop();renderPalPicker(host);if(!$("#map").hidden)$("#heroDuo").innerHTML=frogSVG(undefined,undefined,"bob")+buddySVG()})}
 
-/* ===================== LESSON PLAN (the daily routine) =====================
-   Every lesson runs the same short routine, like a daily phonemic-awareness lesson:
-   rhyme → blend → find a sound → break a word apart → change a sound → letter of the day
-   → letter sounds → read a word → spell a word → write it. The skill inside each slot
-   grows over the 30 lessons. */
-function planLesson(n){const L=ORDER[n],steps=[];
-  steps.push({t:n<6?"rhymeYN":"rhymePick"});
-  steps.push({t:n<4?"onset":n<8?"syllBlend":"blend",max:n<16?3:4});
-  steps.push({t:"iso",pos:n<8?"first":n<15?"last":"middle"});
-  steps.push(n<6?{t:"syllCount"}:{t:"segment",max:n<14?3:4});
-  if(n>=10)steps.push({t:n<16?"addS":n<22?"delS":"subS"});
-  else if(n>=4)steps.push({t:"onset"});
-  steps.push({t:"meet",L});
-  steps.push({t:"trace",text:L,label:L.length>1?"Two letters, one sound":"Little letter"});
-  if(L.length===1&&S.set.caps!==false)steps.push({t:"trace",text:L==="q"?"Qu":L.toUpperCase(),label:"Capital letter"});
-  if(L.length===1)steps.push({t:"caseMatch"});
-  if(n>=1)steps.push({t:"letterQuiz"});
-  if(n>=3&&n%2===1)steps.push({t:"letterName"});
-  if(decodableAt(n).length>=3){steps.push({t:"read"});if(n>=2)steps.push({t:"spell"});if(n>=3&&n%2===1)steps.push({t:"write"})}
-  if(n>=8&&n%2===0)steps.push({t:"capFix"});
-  if(n%5===4){const st=STORIES[n/5|0];steps.push({t:"cover",s:st});st.pages.forEach(p=>steps.push({t:"page",p,s:st}));steps.push({t:"storyQ",s:st})}
-  return steps}
-
 /* ===================== LESSON ENGINE ===================== */
 let LS=null,pad=null;
 function killPad(){if(pad){pad.kill();pad=null}stopSay()}
-function startLesson(n,custom){killPad();LS=custom||{n,steps:planLesson(n),k:0,miss:0,oops:0,used:new Set()};LS.k=0;LS.miss=0;LS.oops=0;LS.used=LS.used||new Set();
-  show("lesson");$("#quit").onclick=()=>leaveLesson();runStep()}
-function leaveLesson(){if(LS&&LS.k>0&&!$("#confirm")){const d=document.createElement("div");d.className="confirm";d.id="confirm";
-    d.innerHTML=`<div class="card" role="dialog" aria-label="Leave the lesson?"><div>${frogSVG(undefined,undefined,"sad")}</div><h2>Hop out now?</h2><p class="hint">This lesson's stars only count when you reach the end.</p><div class="row ctr"><button class="btn" id="stay">Keep going</button><button class="btn alt" id="go">Leave</button></div></div>`;
-    document.body.appendChild(d);d.querySelector("#stay").onclick=()=>d.remove();d.querySelector("#go").onclick=()=>{d.remove();killPad();show(LS.custom?"words":"map")};d.querySelector("#stay").focus();return}
-  killPad();show(LS&&LS.custom?"words":"map")}
+function startLesson(n,custom){killPad();PAUSED=null;LS=custom||{n,steps:planLesson(n,{caps:S.set.caps!==false}),used:new Set()};LS.k=0;LS.miss=0;LS.oops=0;LS.used=LS.used||new Set();
+  show("lesson");runStep()}
+function pauseLesson(){if(LS&&LS.k<LS.steps.length&&!LS.finished){PAUSED=LS}killPad()}
+function resumeLesson(){if(!PAUSED)return;LS=PAUSED;PAUSED=null;show("lesson");runStep()}
+function leaveLesson(){const custom=LS&&LS.custom;if(custom){LS.finished=true}show(custom?(LS.abc?"abc":"words"):"map")}
 function progress(){const T=LS.steps.length,f=LS.k/T;const tr=$("#trail");
   tr.innerHTML=`<div class="water"></div>${LS.steps.map((_,i)=>`<i class="lp ${i<LS.k?"done":""}" style="left:calc(28px + (100% - 76px) * ${i/(T-1||1)})"></i>`).join("")}<div class="walker" style="left:calc(7px + (100% - 76px) * ${f})">${frogSVG()}</div><div class="goal" aria-hidden="true">🏁</div>`}
-function next(){LS.k++;if(LS.k>=LS.steps.length)return LS.custom?finishCustom():finish();sfx.hop();runStep()}
+function next(){if(current!=="lesson")return;LS.k++;if(LS.k>=LS.steps.length){LS.finished=true;return LS.custom?finishCustom():finish()}sfx.hop();runStep()}
 function bubble(text){return `<div class="bubble"><span class="bs">${frogSVG()}</span><p>${text}</p></div>`}
 const STEPS={};
 function runStep(){killPad();progress();const s=LS.steps[LS.k];const stage=$("#stage");stage.innerHTML="";const card=document.createElement("div");card.className="card";stage.appendChild(card);
   try{STEPS[s.t](card,s)}catch(e){console.error(e);next()}}
 
 /* --- picking words --- */
-const pics=a=>a.filter(b=>b.e);
 function fresh1(pool,pred=()=>true){const c=shuffle(pool).filter(pred);const f=c.find(b=>!LS.used.has(b.w))||c[0];if(f)LS.used.add(f.w);return f}
 function others(pool,n,bad){return shuffle(pool.filter(b=>!bad(b))).filter((b,i,a)=>a.findIndex(x=>x.e===b.e)===i).slice(0,n)}
 let STREAK=0;
@@ -223,8 +181,7 @@ function choice(card,{mode,text,items,isRight,prompt,nameThem=true,after,labels=
   setTimeout(ask,350)}
 
 /* ----- 1. rhyme ----- */
-const RHY=()=>pics(ONE).filter(b=>ONE.filter(x=>x!==b&&rimeOf(x)===rimeOf(b)).length>0);
-STEPS.rhymeYN=(card,s)=>{const a=fresh1(RHY());const yes=Math.random()<.5;
+STEPS.rhymeYN=(card,s)=>{const a=fresh1(RHY);const yes=Math.random()<.5;
   const b=yes?pick(ONE.filter(x=>x!==a&&x.e&&rimeOf(x)===rimeOf(a))):pick(ONE.filter(x=>x.e&&rimeOf(x)!==rimeOf(a)&&x.ph[0]!==a.ph[0]));
   const items=[{w:"Yes, they rhyme",e:"👍",say:"yes",v:true},{w:"No, they don't rhyme",e:"👎",say:"no",v:false}];
   choice(card,{mode:"Rhyme time",text:`Do <b>${esc(a.w)}</b> and <b>${esc(b.w)}</b> rhyme? Rhymes sound the same at the end.`,items,nameThem:false,labels:false,
@@ -234,7 +191,7 @@ STEPS.rhymeYN=(card,s)=>{const a=fresh1(RHY());const yes=Math.random()<.5;
     after:async()=>{await sayThen(yes?`Yes! ${a.w}, ${b.w}. They rhyme!`:`No. ${a.w}, ${b.w}. They end differently.`)}});
   const pr=document.createElement("div");pr.className="row ctr";pr.innerHTML=`<span class="hero-pic" id="pa">${a.e}</span><span class="hero-pic" style="font-size:40px">＋</span><span class="hero-pic" id="pb">${b.e}</span>`;
   card.insertBefore(pr,card.querySelector(".opts"));function hl(i){["#pa","#pb"].forEach((q,k)=>{const el=card.querySelector(q);if(el)el.style.transform=k===i?"scale(1.15)":""})}};
-STEPS.rhymePick=(card,s)=>{const a=fresh1(RHY());const r=pick(ONE.filter(x=>x!==a&&x.e&&rimeOf(x)===rimeOf(a)));
+STEPS.rhymePick=(card,s)=>{const a=fresh1(RHY);const r=pick(ONE.filter(x=>x!==a&&x.e&&rimeOf(x)===rimeOf(a)));
   const items=shuffle([r,...others(pics(ONE),2,x=>rimeOf(x)===rimeOf(a)||x.e===a.e)]);
   choice(card,{mode:"Rhyme time",text:`What rhymes with <b>${esc(a.w)}</b> ${a.e}?`,items,isRight:b=>b===r,
     prompt:()=>sayThen(`What rhymes with ${a.w}?`),after:async b=>{await sayThen(`${a.w}, ${b.w}. They rhyme!`)}})};
@@ -285,9 +242,6 @@ STEPS.segment=(card,s)=>{const a=fresh1(pics(ONE),b=>b.ph.length>=2&&b.ph.length
     demo:async()=>{const pr=card.querySelector("#segpads");pr.style.opacity=1;await sayParts(a.ph.map(sn),{gap:330,rate:.8,on:i=>lightPads(card,i)});await sayThen(`${a.w}. ${n} sounds!`)}})};
 
 /* ----- 5. changing sounds (add, take away, swap) ----- */
-const same=(x,y)=>x.length===y.length&&x.every((v,i)=>v===y[i]);
-const ADDP=[];pics(ONE).forEach(big=>pics(ONE).forEach(small=>{if(big.ph.length===small.ph.length+1&&same(big.ph.slice(1),small.ph))ADDP.push([small,big.ph[0],big])}));
-const SUBP=[];pics(ONE).forEach(x=>pics(ONE).forEach(y=>{if(x!==y&&x.ph.length===y.ph.length&&x.e!==y.e){const d=x.ph.map((p,i)=>p!==y.ph[i]?i:-1).filter(i=>i>=0);if(d.length===1)SUBP.push([x,d[0],y])}}));
 STEPS.addS=(card,s)=>{const [small,p,big]=pick(ADDP);const items=shuffle([big,small,...others(pics(ONE),1,x=>x===big||x===small)]);
   choice(card,{mode:"Add a sound",text:`Say <b>${esc(small.w)}</b> ${small.e}. Now add <b>/${esc(p)}/</b> to the start. What's the new word?`,items,isRight:b=>b===big,
     prompt:()=>sayThen(`Say ${small.w}.`,300,`Now add`,sn(p),`to the start. What's the new word?`),after:async()=>{await sayThen(`${sn(p)}, ${small.w}. ${big.w}!`)}})};
@@ -320,9 +274,6 @@ STEPS.letterQuiz=(card,s)=>{const n=LS.n;const known=ORDER.slice(0,n+1);const ta
 
 
 /* ----- big and little letters (read both cases) ----- */
-const CONF={b:"dpq",d:"bpq",p:"qbd",q:"pdg",n:"mhu",m:"nw",u:"nvy",h:"nk",i:"jlt",l:"it",j:"ig",t:"fl",f:"t",a:"oe",e:"ca",c:"eo",o:"ca",g:"qy",y:"gv",v:"wy",w:"vm",s:"z",z:"s",k:"h",r:"n",x:"k"};
-const ABC="abcdefghijklmnopqrstuvwxyz".split("");
-function confusers(t,n){const c=(CONF[t]||"").split("").filter(Boolean);return shuffle([...new Set([...shuffle(c),...shuffle(ABC)])].filter(x=>x!==t)).sort((x,y)=>(c.includes(y)?1:0)-(c.includes(x)?1:0)).slice(0,n)}
 const lname2=l=>l==="a"?"ay":l;
 STEPS.caseMatch=(card,s)=>{const n=LS.n;const known=ORDER.slice(0,n+1).filter(l=>l.length===1);let target=s.L||(Math.random()<.6&&ORDER[n].length===1?ORDER[n]:pick(known.length?known:ABC));
   const up=s.dir?s.dir==="up":Math.random()<.5;const shown=up?target.toUpperCase():target;const conv=x=>up?x:x.toUpperCase();
@@ -337,11 +288,6 @@ STEPS.letterName=(card,s)=>{const n=LS.n;const known=ORDER.slice(0,n+1).filter(l
   choice(card,{mode:"Letter names",text:`Find <b>${big?"capital":"little"} ${esc(target)}</b>. Look carefully: some letters are tricky twins!`,items:opts,nameThem:false,isRight:b=>b.l===target&&b.big===big,
     optHTML:b=>`<span style="font-size:56px">${esc(b.w)}</span>`,prompt:()=>sayThen(`Find ${big?"capital":"little"} ${lname2(target)}.`),after:async()=>{await sayThen(`${big?"Capital":"Little"} ${lname2(target)}!`)}})};
 /* ----- capitals in sentences ----- */
-const CAPSENT=["Pip sat on a log.","Dad got a red cap.","Max and Pip ran.","Sam has a big dog.","The cat is on the mat.","Kim can hop.","A bug is in the cup.","Ben fed the fish."];
-function capWrong(t){const out=new Set();out.add(t[0].toLowerCase()+t.slice(1));const w=t.split(" ");
-  w.forEach((x,i)=>{if(i>0&&/^[A-Z]/.test(x)){const c=w.slice();c[i]=x[0].toLowerCase()+x.slice(1);out.add(c.join(" "))}});
-  const k=1+Math.floor(Math.random()*(w.length-1));const c=w.slice();if(/^[a-z]/.test(c[k])){c[k]=c[k][0].toUpperCase()+c[k].slice(1);out.add(c.join(" "))}
-  out.delete(t);return shuffle([...out]).slice(0,2)}
 STEPS.capFix=(card,s)=>{const sent=pick(CAPSENT);const items=shuffle([sent,...capWrong(sent)]).map(x=>({w:x}));
   choice(card,{mode:"Capital letters",text:`Which one is written the right way? A sentence starts with a capital. Names start with a capital too.`,items,nameThem:false,isRight:b=>b.w===sent,
     optHTML:b=>`<span style="font-size:clamp(20px,5vw,28px);line-height:1.3">${esc(b.w)}</span>`,prompt:()=>sayThen(sent,250,"Which one has capitals in the right places?"),
@@ -391,7 +337,7 @@ function traceStep(card,text,label,word){
   const fb=card.querySelector(".feedback");let phase="demo";
   const go=(mode)=>{phase=mode;if(pad)pad.kill();pad=new TracePad(card.querySelector("#pw"),text,mode,done);pad.setFb(fb)};
   function done(oops){LS.oops+=oops;if(phase==="trace"){sfx.good();fb.textContent="Now on your own! Start at the green dot.";fb.className="feedback good";say("Now write it on your own.");setTimeout(()=>card.isConnected&&go("solo"),900)}
-    else if(phase==="solo"){sfx.good();fb.textContent=pick(["Beautiful writing!","You wrote it!","Great job writing!"]);fb.className="feedback good";mood(card.querySelector(".bubble .frog"),"happy");S.got["W:"+text]=1;save();confetti(40);setTimeout(()=>card.isConnected&&next(),1100)}
+    else if(phase==="solo"){sfx.good();fb.textContent=pick(["Beautiful writing!","You wrote it!","Great job writing!"]);fb.className="feedback good";mood(card.querySelector(".bubble .frog"),"happy");if(!LS.custom||LS.abc)S.got["W:"+text]=1;save();confetti(40);setTimeout(()=>card.isConnected&&next(),1100)}
     else{fb.textContent="Your turn! Start at the green dot and follow the arrow.";fb.className="feedback";go("trace")}}
   card.querySelector("#watch").onclick=()=>go("demo");card.querySelector("#redo").onclick=()=>go(phase==="demo"?"trace":phase);
   card.querySelector("#skip").onclick=()=>{LS.oops+=3;next()};
@@ -506,3 +452,243 @@ function chorus(){const d=document.createElement("div");d.className="chorus";con
   setTimeout(()=>d.remove(),3600)}
 function parade(){if(REDUCED)return;const w=Wd();const list=ROSTER[w.id].slice(0,unl(w));const cast=[frogSVG(),...shuffle(list).slice(0,5).map(p=>palSVG(p))];cast.forEach((h,i)=>{const d=document.createElement("div");d.className="paradep";d.style.animationDelay=(i*.55)+"s";d.innerHTML=`<span class="dance">${h}</span>`;document.body.appendChild(d);setTimeout(()=>d.remove(),5200+i*600)})}
 function celebrate(kind=S.eq.party){if(S.set.calm){confetti(40);return}({confetti:()=>confetti(),bubbles:()=>{bubbleStorm();confetti(50)},fireworks:fireworks,chorus:()=>{chorus();confetti(50)},parade:()=>{parade();confetti(50)}}[kind]||confetti)()}
+
+/* ===================== MINI-GAMES ===================== */
+const GAMES={
+ rhyme:{n:"Bubble Rhymes",e:"🫧",d:"Pop every bubble that rhymes with Pip's word.",need:0},
+ fly:{n:"Fly Snack",e:"🪰",d:"Pip is hungry! Tap the fly wearing the letter Pip says.",need:1},
+ hop:{n:"River Hop",e:"🪷",d:"Hop across the river by spelling the word, pad by pad.",need:3},
+ match:{n:"Big & Little",e:"🃏",d:"Flip the cards to find each capital and its little partner.",need:2}};
+let GS=null;
+function stopGame(){if(GS){GS.dead=true;cancelAnimationFrame(GS.raf);GS.timers.forEach(clearTimeout);GS.timers.forEach(clearInterval);GS=null}}
+function renderGames(){const d=doneCount();
+  $("#gameGrid").innerHTML=Object.entries(GAMES).map(([id,g])=>{const lock=d<g.need;const best=S.games[id]||0;
+    return `<button class="gcard ${lock?"lock":""}" data-g="${id}"><span class="gi" aria-hidden="true">${lock?"🔒":g.e}</span><h3>${esc(g.n)}</h3><p>${lock?`Opens after ${g.need} lesson${g.need>1?"s":""}.`:esc(g.d)}</p>${best&&!lock?`<p>🏆 Best: ${best}</p>`:""}</button>`}).join("");
+  $("#gameGrid").querySelectorAll(".gcard").forEach(b=>b.onclick=()=>{const g=GAMES[b.dataset.g];if(doneCount()<g.need){sfx.bad();toast(`Finish ${g.need-doneCount()} more lesson${g.need-doneCount()>1?"s":""} to open ${g.n}!`);return}startGame(b.dataset.g)})}
+function startGame(id){stopGame();GS={id,dead:false,raf:0,timers:[],score:0};show("game");$("#gtitle").textContent=GAMES[id].e+" "+GAMES[id].n;$("#gquit").onclick=()=>{stopGame();show("games")};
+  ({rhyme:gameRhyme,fly:gameFly,hop:gameHop,match:gameMatch})[id]($("#gstage"))}
+function arenaHTML(){const th=THEMES[S.eq.theme]||THEMES.lily;return `<div class="arena" id="arena" style="background:${th.bg}"><div class="ghud" id="ghud"></div></div>`}
+function gameOver(stage,text){const g=GS;if(!g)return;const coins=Math.min(15,g.score);S.coins+=coins;S.games[g.id]=Math.max(S.games[g.id]||0,g.score);save();renderHUD();stopGame();
+  stage.innerHTML=`<div class="card reward"><h2>${esc(text)}</h2><div class="stage-duo dance">${frogSVG()}${buddySVG()}</div><div class="coinsup">+${coins} coins</div>
+   <div class="row ctr"><button class="btn big" id="again">▶ Play again</button><button class="btn alt" id="back">🎮 Games</button><button class="btn alt" id="mp">🗺️ Map</button></div></div>`;
+  sfx.win();celebrate();$("#again").onclick=()=>startGame(g.id);$("#back").onclick=()=>show("games");$("#mp").onclick=()=>show("map")}
+const taughtLetters=()=>{const n=Math.max(5,doneCount());return ORDER.slice(0,Math.min(LESSONS,n+1)).filter(l=>l.length===1)};
+
+function gameRhyme(stage){stage.innerHTML=arenaHTML();const A=$("#arena"),hud=$("#ghud");const fams=RHY;let target=pick(fams),pops=0,t0=performance.now(),last=0;const DUR=45000;const items=[];
+  const setHud=()=>{hud.innerHTML=`<button class="target" id="tg"><span class="emo">${target.e}</span>${esc(target.w)} 🔊</button><span class="pill">⭐ ${GS.score}</span><span class="pill">⏱️ ${Math.max(0,Math.ceil((DUR-(performance.now()-t0))/1000))}</span>`;$("#tg").onclick=()=>say(`Find words that rhyme with ${target.w}`)};
+  setHud();say(`Pop the bubbles that rhyme with ${target.w}!`);
+  function spawn(){const W=A.clientWidth,H=A.clientHeight;const rhyme=Math.random()<.42;const fam=ONE.filter(x=>x.e&&x!==target&&rimeOf(x)===rimeOf(target));
+    const b=rhyme&&fam.length?pick(fam):pick(pics(ONE).filter(x=>rimeOf(x)!==rimeOf(target)));const el=document.createElement("button");el.className="gitem bubg";el.innerHTML=b.e;el.setAttribute("aria-label",b.w);
+    const it={el,b,x:20+Math.random()*(W-120),y:H+10,v:45+Math.random()*35,ph:Math.random()*6,dead:false};A.appendChild(el);items.push(it);
+    el.onclick=()=>{if(it.dead||!GS)return;if(rimeOf(b)===rimeOf(target)){it.dead=true;el.classList.add("pop");sfx.good();GS.score++;pops++;say(b.w);setTimeout(()=>el.remove(),350);
+        if(pops%5===0){target=pick(fams.filter(x=>rimeOf(x)!==rimeOf(target)));setTimeout(()=>GS&&say(`New word! Rhymes with ${target.w}`),600)}setHud()}
+      else{sfx.bad();el.animate([{transform:el.style.transform+" translateX(-8px)"},{transform:el.style.transform+" translateX(8px)"}],{duration:120,iterations:3});say(`${b.w}. No rhyme.`)}}}
+  function frame(now){if(!GS||GS.dead)return;const dt=Math.min(.05,(now-(last||now))/1000);last=now;if(now-t0>DUR)return gameOver(stage,`You popped ${GS.score} rhymes!`);
+    if(!frame.n||now-frame.n>950){frame.n=now;spawn();setHud()}
+    items.forEach(it=>{if(it.dead)return;it.y-=it.v*dt;it.ph+=dt*2;it.el.style.transform=`translate(${it.x+Math.sin(it.ph)*14}px,${it.y}px)`;if(it.y<-110){it.dead=true;it.el.remove()}});
+    GS.raf=requestAnimationFrame(frame)}
+  GS.raf=requestAnimationFrame(frame)}
+
+function gameFly(stage){stage.innerHTML=arenaHTML();const A=$("#arena"),hud=$("#ghud");A.insertAdjacentHTML("beforeend",`<div class="gfrog">${frogSVG()}</div>`);
+  const letters=taughtLetters();let round=0,target=null,flies=[],last=0;const ROUNDS=10;
+  const setHud=()=>{hud.innerHTML=`<button class="target" id="tg">🔊 Hear the sound</button><span class="pill">🪰 ${GS.score}</span><span class="pill">${round}/${ROUNDS}</span>`;$("#tg").onclick=()=>sayThen(sn(LSND[target]),200,sn(LSND[target]))};
+  function newRound(){flies.forEach(f=>f.el.remove());flies=[];if(round>=ROUNDS)return gameOver(stage,`Pip ate ${GS.score} flies. Yum!`);round++;
+    const pool=shuffle(letters.filter(l=>l!=="q"));target=pool[0];const set=[target,...pool.filter(l=>LSND[l]!==LSND[target]).slice(0,3)];
+    const W=A.clientWidth,H=A.clientHeight;
+    set.forEach((l,i)=>{const el=document.createElement("button");el.className="gitem flyg";el.innerHTML=`🪰<b>${esc(l)}</b>`;el.setAttribute("aria-label","fly with letter "+l);A.appendChild(el);
+      const f={el,l,cx:60+((i+.5)/set.length)*(W-180),cy:80+Math.random()*(H*.45),ph:Math.random()*6,sp:.6+Math.random()*.6,dead:false};flies.push(f);
+      el.onclick=()=>{if(f.dead||!GS)return;if(l===target){f.dead=true;eat(f)}else{sfx.bad();f.cx=60+Math.random()*(A.clientWidth-180);f.ph+=2;say(sn(LSND[l]))}}});
+    setHud();GS.timers.push(setTimeout(()=>GS&&sayThen("Find",sn(LSND[target])),300))}
+  function eat(f){const fr=A.querySelector(".gfrog").getBoundingClientRect(),ar=A.getBoundingClientRect(),fl=f.el.getBoundingClientRect();
+    const x0=fr.left-ar.left+fr.width/2,y0=fr.top-ar.top+fr.height*.55,x1=fl.left-ar.left+fl.width/2,y1=fl.top-ar.top+fl.height/2;
+    const t=document.createElement("div");t.className="tongue";t.style.left=x0+"px";t.style.top=y0+"px";t.style.width=Math.hypot(x1-x0,y1-y0)+"px";t.style.transform=`rotate(${Math.atan2(y1-y0,x1-x0)}rad) scaleX(0)`;A.appendChild(t);
+    t.animate([{transform:`rotate(${Math.atan2(y1-y0,x1-x0)}rad) scaleX(0)`},{transform:`rotate(${Math.atan2(y1-y0,x1-x0)}rad) scaleX(1)`},{transform:`rotate(${Math.atan2(y1-y0,x1-x0)}rad) scaleX(0)`}],{duration:380});
+    sfx.ribbit();GS.score++;mood(A.querySelector(".gfrog"),"happy");setTimeout(()=>{t.remove();f.el.remove()},380);say(`${target.length>1?target:target} says ${sn(LSND[target])}`);GS.timers.push(setTimeout(()=>GS&&newRound(),1300))}
+  function frame(now){if(!GS||GS.dead)return;const dt=Math.min(.05,(now-(last||now))/1000);last=now;flies.forEach(f=>{if(f.dead)return;f.ph+=dt*f.sp*2;f.el.style.transform=`translate(${f.cx+Math.sin(f.ph)*40}px,${f.cy+Math.cos(f.ph*1.3)*26}px)`});GS.raf=requestAnimationFrame(frame)}
+  newRound();GS.raf=requestAnimationFrame(frame)}
+
+function gameHop(stage){let k=0;const ROUNDS=5;const n=Math.max(4,doneCount()-1);let dec=decodableAt(Math.min(LESSONS-1,n)).filter(d=>d.ch.length<=4);if(dec.length<5)dec=DEC.filter(d=>["cat","sat","pin","tap","sit","map","pan"].includes(d.w));
+  const words=shuffle(dec).slice(0,ROUNDS);
+  function round(){if(!GS)return;if(k>=words.length)return gameOver(stage,`You hopped across ${GS.score} rivers!`);const d=words[k];const L=taughtLetters().filter(c=>!d.ch.includes(c)&&c!=="q");const pads=shuffle([...d.ch,...shuffle(L).slice(0,3)]);let j=0;
+    stage.innerHTML=`<div class="card"><div class="mode">River ${k+1} of ${ROUNDS}</div>${bubble(`Spell the word Pip says to hop across!`)}${d.e?`<span class="hero-pic">${d.e}</span>`:""}
+     <div class="boxes">${d.ch.map((c,i)=>`<div class="box ${i===0?"cur":""}" data-i="${i}"></div>`).join("")}</div>
+     <div class="river">${pads.map((c,i)=>`<button class="tile" data-c="${esc(c)}">${esc(c)}</button>`).join("")}</div>
+     <div class="row ctr"><button class="btn alt sm" id="hear">🔊 Hear the word</button></div><div class="feedback" aria-live="polite"></div></div>`;
+    const bx=[...stage.querySelectorAll(".box")],fb=stage.querySelector(".feedback");stage.querySelector("#hear").onclick=()=>sayThen(d.w);
+    stage.querySelectorAll(".river .tile").forEach(t=>t.onclick=async()=>{if(j>=d.ch.length||t.classList.contains("used"))return;
+      if(t.dataset.c===d.ch[j]){t.classList.add("used");bx[j].textContent=d.ch[j];bx[j].classList.add("filled");bx[j].classList.remove("cur");sfx.hop();say(sn(chunkSnd(d.ch[j])));j++;
+        if(j<d.ch.length)bx[j].classList.add("cur");else{GS.score++;fb.textContent="Splash! You made it across!";fb.className="feedback good";mood(stage.querySelector(".bubble .frog"),"happy");await sleep(400);await sayThen(d.w+"!");k++;GS&&GS.timers.push(setTimeout(round,500))}}
+      else{sfx.bad();t.classList.remove("wrong");void t.offsetWidth;t.classList.add("wrong");fb.textContent="Listen for the next sound.";fb.className="feedback bad";say(sn(chunkSnd(d.ch[j])))}});
+    sayThen(`Spell ${d.w}.`)}
+  round()}
+
+function gameMatch(stage){const L=shuffle(taughtLetters().filter(l=>l!=="q")).slice(0,6);while(L.length<6){const x=pick(ABC);if(!L.includes(x))L.push(x)}
+  const cards=shuffle(L.flatMap(l=>[{l,f:l.toUpperCase()},{l,f:l}]));let open=[],found=0,flips=0,busy=false;
+  stage.innerHTML=`<div class="card"><div class="mode">Find the partners</div>${bubble("Flip two cards. Find a capital letter and its little partner!")}<div class="mgrid">${cards.map((c,i)=>`<button class="mcard" data-i="${i}" aria-label="card ${i+1}"><span>?</span></button>`).join("")}</div><div class="feedback" aria-live="polite"></div></div>`;
+  const els=[...stage.querySelectorAll(".mcard")],fb=stage.querySelector(".feedback");say("Find the big and little partners!");
+  els.forEach(b=>b.onclick=async()=>{const i=+b.dataset.i,c=cards[i];if(busy||b.classList.contains("up")||!GS)return;b.classList.add("up");b.innerHTML=`<span>${esc(c.f)}</span>`;sfx.pop();say((/[A-Z]/.test(c.f)?"capital ":"little ")+lname2(c.l));open.push(i);
+    if(open.length<2)return;flips++;const [x,y]=open;open=[];
+    if(cards[x].l===cards[y].l){found++;GS.score=Math.max(1,12-Math.max(0,flips-6));els[x].classList.add("got");els[y].classList.add("got");sfx.good();fb.textContent=`${cards[x].l.toUpperCase()} and ${cards[x].l}. Partners!`;fb.className="feedback good";
+      if(found===6){GS.score=Math.max(4,15-Math.max(0,flips-6));await sleep(700);gameOver(stage,`You matched all 6 in ${flips} tries!`)}}
+    else{busy=true;await sleep(900);[x,y].forEach(k=>{els[k].classList.remove("up");els[k].innerHTML="<span>?</span>"});busy=false}})}
+
+/* ===================== ABC PRACTICE (every letter, little and big) ===================== */
+function renderAbc(){const known=new Set(ORDER.slice(0,doneCount()+1));
+  $("#abcBody").innerHTML=`<p class="hint" style="background:var(--chip);border-radius:14px;padding:8px 14px;max-width:none;margin-bottom:12px">Pick any letter to watch, trace and write it, little and big. ✓ marks show what you've written on your own. ⭐ letters are ones you've met in lessons.</p>
+   <div class="book">${ABC.map(l=>{const lo=S.got["W:"+l],up=S.got["W:"+(l==="q"?"Qu":l.toUpperCase())];return `<button class="bk abck" data-l="${l}" aria-label="Practice ${l}"><span>${l.toUpperCase()}${l}</span><span class="p">${known.has(l)?"⭐ ":""}${lo?"✓"+l:"·"} ${up?"✓"+l.toUpperCase():"·"}</span></button>`}).join("")}</div>`;
+  $("#abcBody").querySelectorAll(".abck").forEach(b=>b.onclick=()=>{const l=b.dataset.l;const n=Math.max(0,ORDER.indexOf(l));
+    startLesson(n,{custom:true,abc:true,letter:l,n,steps:[{t:"meet",L:l},{t:"trace",text:l,label:"Little letter"},{t:"trace",text:l==="q"?"Qu":l.toUpperCase(),label:"Capital letter"},{t:"caseMatch",L:l,dir:"up"},{t:"caseMatch",L:l,dir:"down"}],used:new Set()})})}
+
+/* ===================== CLOSET ===================== */
+function itemIcon(cat,id){const it=CATS.find(c=>c[0]===cat)[2][id];
+  if(cat==="frog")return frogSVG(FROGS[id],S.eq.hat);if(cat==="hat")return frogSVG(undefined,id);
+  if(cat==="theme")return `<div style="width:100%;height:100%;display:grid;place-items:center;background:${it.bg};font-size:44px">${it.e}</div>`;
+  if(cat==="pen")return `<span style="font-family:var(--f-read);font-weight:700;font-size:44px;${it.rainbow?"background:linear-gradient(90deg,#FF4D4D,#FFB13D,#FFE14D,#4CD964,#3EA6FF,#8E5BFF);-webkit-background-clip:text;background-clip:text;color:transparent":`color:${it.c}`};${it.glow?`text-shadow:0 0 10px ${it.d||it.c}`:""}">abc</span>`;
+  return `<span>${it.e}</span>`}
+function renderCloset(){const pv=$("#closetPreview");pv.innerHTML=`<span class="dance">${frogSVG()}</span><span>${buddySVG()}</span><div style="display:grid;gap:6px;text-align:left"><b style="font-family:var(--f-display);font-size:22px">Pip and ${esc(buddy().n)}</b><span class="hint">Earn coins in lessons and games. Every 3rd lesson brings a surprise gift.</span></div>`;
+  $("#closetBody").innerHTML=CATS.map(([cat,label,set])=>`<div class="section-title"><h2>${label}</h2>${cat==="party"?`<span>Plays when you finish a lesson. Tap a picture to preview it.</span>`:""}</div><div class="shop">${Object.entries(set).map(([id,it])=>{const own=S.own[cat].includes(id),eq=S.eq[cat]===id;
+    return `<div class="item ${eq?"equipped":""}"><div class="ico" ${cat==="party"?`role="button" tabindex="0" data-prev="${id}" aria-label="Preview ${esc(it.n)}"`:""}>${itemIcon(cat,id)}</div><h3>${esc(it.n)}</h3>${eq?`<button class="btn sm" disabled>Using</button>`:own?`<button class="btn sm" data-eq="${cat}:${id}">Use</button>`:`<button class="btn sun sm ${S.coins<it.price?"poor":""}" data-buy="${cat}:${id}">${COIN} ${it.price}</button>`}</div>`}).join("")}</div>`).join("")+
+   `<div class="section-title"><h2>Buddy pals</h2><span>Your buddy cheers you on</span></div><div class="card" id="closetPals" style="justify-items:stretch"></div>`;
+  renderPalPicker($("#closetPals"));
+  $("#closetBody").querySelectorAll("[data-prev]").forEach(el=>{el.onclick=el.onkeydown=e=>{if(e.type==="keydown"&&e.key!=="Enter"&&e.key!==" ")return;celebrate(el.dataset.prev)}});
+  $("#closetBody").querySelectorAll("[data-eq]").forEach(b=>b.onclick=()=>{const [c,id]=b.dataset.eq.split(":");S.eq[c]=id;save();sfx.pop();if(c==="theme")renderBackdrop();renderCloset();renderHUD()});
+  $("#closetBody").querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>{const [c,id]=b.dataset.buy.split(":");const it=CATS.find(x=>x[0]===c)[2][id];
+    if(S.coins<it.price){sfx.bad();toast(`You need ${it.price-S.coins} more coins. Finish a lesson or play a game to earn them!`);return}
+    S.coins-=it.price;S.own[c].push(id);S.eq[c]=id;save();sfx.coin();toast(`New ${it.n}!`);if(c==="theme")renderBackdrop();renderCloset();renderHUD();confetti(80)})}
+
+/* ===================== STICKERS ===================== */
+function renderBook(){const g=S.got;const lettersGot=ORDER.filter(l=>g["L:"+l]).length;
+  const words=Object.keys(g).filter(k=>/^[RS]:/.test(k)).map(k=>k.slice(2)).filter((w,i,a)=>a.indexOf(w)===i);
+  $("#bookBody").innerHTML=`<p class="hint" style="background:var(--chip);border-radius:14px;padding:8px 14px;max-width:none;margin-bottom:12px">${lettersGot} of ${ORDER.length} letter stickers · ${words.length} words read or spelled · tap a sticker to hear it.</p>
+   <div class="section-title"><h2 style="font-size:20px">Letters</h2></div><div class="book">${ORDER.map(l=>`<button class="bk ${g["L:"+l]?"":"no"}" data-say="${esc(l)}" aria-label="${g["L:"+l]?"letter "+esc(l):"not earned yet"}">${l.length>1?esc(l):esc(l.toUpperCase()+l)}<span class="p">${esc(KEYW[l][1])}</span></button>`).join("")}</div>
+   <div class="section-title"><h2 style="font-size:20px">Words I read and spelled</h2></div><div class="book">${words.length?words.map(w=>`<button class="bk" data-w="${esc(w)}"><span class="emo">${DEC_PIC[w]||"📖"}</span><span style="font-size:24px">${esc(w)}</span></button>`).join(""):`<p class="hint">Read a word in a lesson to start your word stickers.</p>`}</div>
+   <div class="section-title"><h2 style="font-size:20px">Stories</h2></div><div class="book">${STORIES.map(s=>`<div class="bk ${g["T:"+s.t]?"":"no"}"><span class="emo">${s.e}</span><span class="p">${esc(s.t)}</span></div>`).join("")}</div>
+   ${WORLDS.map(w=>`<div class="section-title"><h2 style="font-size:20px">${w.ic} ${esc(w.name)} pals</h2><span>${unl(w)} of ${ROSTER[w.id].length}</span></div><div class="book">${ROSTER[w.id].map((p,i)=>`<div class="bk ${i<unl(w)?"":"no"}">${palSVG(p)}<span class="p">${i<unl(w)?esc(p.n):"???"}</span></div>`).join("")}</div>`).join("")}`;
+  $("#bookBody").querySelectorAll("[data-say]").forEach(b=>b.onclick=()=>{const l=b.dataset.say;if(!S.got["L:"+l])return;sayThen(sn(LSND[l]),200,KEYW[l][0])});
+  $("#bookBody").querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>say(b.dataset.w))}
+
+/* ===================== MY WORDS (type or ask with your voice) ===================== */
+let DICT=null,micBtn=null;/* no browser speech recognition: Chrome sends that audio to Google. Voice only through Claude dictation. */
+let micOK=false;
+function renderWords(){$("#wordsFrog").innerHTML=frogSVG(undefined,undefined,"bob");const inp=$("#inWord"),nm=$("#isName");
+  const upd=()=>{const raw=cleanWord(inp.value);const w=nm.checked?capName(raw):raw.toLowerCase();$("#wordPrev").innerHTML=w?`<div class="wordshow">${[...w].map(c=>`<span>${c===" "?"&nbsp;":esc(c)}</span>`).join("")}</div>`:`<p class="hint">Your word shows up here.</p>`;
+    $("#teachBtn").disabled=!w;$("#wordNote").textContent=nm.checked&&w?`Names start with a capital letter, so we write ${w}. Names are never saved.`:"Tip: you can fix the spelling by typing.";};
+  inp.oninput=nm.onchange=upd;upd();
+  $("#teachBtn").onclick=()=>{const raw=cleanWord(inp.value);if(!raw)return;teachWord(raw,nm.checked)};
+  $("#savedWords").innerHTML=S.mine.length?S.mine.map(x=>`<button class="chip" data-w="${esc(x)}">${esc(x)}</button>`).join(""):`<p class="hint">Words you learn are saved here to practice again.</p>`;
+  $("#savedWords").querySelectorAll(".chip").forEach(c=>c.onclick=()=>teachWord(c.dataset.w,/^[A-Z]/.test(c.dataset.w)));
+  document.querySelectorAll(".mic").forEach(b=>{b.hidden=!micOK;b.onclick=()=>listen(b)});$("#askNote").hidden=!micOK;$("#noMic").hidden=micOK}
+function teachWord(raw,isName){let w=cleanWord(raw).slice(0,16);if(!w)return;w=isName?capName(w):w.toLowerCase();
+  /* names are practised but never kept: they may be a child's real name */
+  if(!isName){if(!S.mine.includes(w))S.mine.unshift(w);S.mine=S.mine.slice(0,24);save()}
+  startLesson(0,{custom:true,word:w,isName,steps:[{t:"cmeet",w},{t:"cbuild",w},{t:"trace",text:w,label:"Write it"},{t:"cread",w}],used:new Set()})}
+const lname1=c=>{c=c.toLowerCase();return c==="a"?"ay":c};
+STEPS.cmeet=(card,s)=>{const w=s.w;const ls=[...w].filter(c=>c!==" ");
+  card.innerHTML=`<div class="mode">${LS.isName?"Learn a name":"Learn a word"}</div>${bubble(`${LS.isName?"This name":"This word"} has <b>${ls.length} letters</b>. Listen to Pip spell it!`)}
+   <div class="wordshow" id="ws">${[...w].map((c,i)=>`<span data-i="${i}">${c===" "?"&nbsp;":esc(c)}</span>`).join("")}</div>
+   ${LS.isName?`<div class="tip">👑 Names start with a big capital letter: <b style="font-family:var(--f-read)">${esc(w[0])}</b>.</div>`:""}
+   <div class="row ctr"><button class="btn sky" id="sp">🔤 Spell it again</button><button class="btn alt" id="sw">🔊 Say it</button></div><button class="btn big" id="go">Next →</button>`;
+  const sp=[...card.querySelectorAll("#ws span")];const lit=i=>sp.forEach((x,k)=>x.classList.toggle("lit",k===i));
+  const idx=[...w].map((c,i)=>c===" "?-1:i).filter(i=>i>=0);
+  const spell=async()=>{if(!await sayThen(w))return;await sleep(250);await sayParts(idx.map(i=>lname1(w[i])),{gap:250,rate:.9,on:k=>lit(k<0?-1:idx[k])});await speak1(w,1)};
+  card.querySelector("#sp").onclick=spell;card.querySelector("#sw").onclick=()=>say(w);card.querySelector("#go").onclick=next;setTimeout(spell,300)};
+STEPS.cbuild=(card,s)=>{const w=s.w;const chars=[...w].filter(c=>c!==" ");const pool="abcdefghijklmnoprstuvwyz".split("").filter(c=>!chars.map(x=>x.toLowerCase()).includes(c));const tiles=shuffle([...chars,...shuffle(pool).slice(0,3)]);
+  card.innerHTML=`<div class="mode">Build it</div>${bubble(`Build <b>${esc(w)}</b> with the letter tiles. Tap a box to hear which letter goes there.`)}
+   <div class="boxes">${chars.map((c,i)=>`<button class="box ${i===0?"cur":""}" data-i="${i}" aria-label="letter box ${i+1}"></button>`).join("")}</div>
+   <div class="tiles">${tiles.map(c=>`<button class="tile" data-c="${esc(c)}">${esc(c)}</button>`).join("")}</div><div class="feedback" aria-live="polite"></div>`;
+  let k=0,tries=0;const bx=[...card.querySelectorAll(".box")],fb=card.querySelector(".feedback");
+  bx.forEach(b=>b.onclick=()=>say(lname1(chars[+b.dataset.i])));
+  card.querySelectorAll(".tile").forEach(t=>t.onclick=async()=>{if(k>=chars.length||t.classList.contains("used"))return;
+    if(t.dataset.c===chars[k]){t.classList.add("used");bx[k].textContent=chars[k];bx[k].classList.add("filled");bx[k].classList.remove("cur");sfx.pop();say(lname1(chars[k]));k++;
+      if(k<chars.length)bx[k].classList.add("cur");else{streak(!tries);sfx.good();fb.textContent=pick(PRAISE);fb.className="feedback good";mood(card.querySelector(".bubble .frog"),"happy");await sleep(400);await sayThen(`You built ${w}!`);if(card.isConnected)next()}}
+    else{tries++;LS.miss++;t.classList.remove("wrong");void t.offsetWidth;t.classList.add("wrong");sfx.bad();fb.textContent=`Next comes ${chars[k]}.`;fb.className="feedback bad";say(`Next comes ${lname1(chars[k])}`)}});
+  setTimeout(()=>sayThen(`Build ${w}.`),300)};
+STEPS.cread=(card,s)=>{const w=s.w;const lw=w.toLowerCase();const fakes=new Set();const arr=[...w];
+  for(let tries=0;fakes.size<2&&tries<40;tries++){const a=arr.slice();const i=1+Math.random()*(a.length-2)|0;if(Math.random()<.5&&a.length>2){[a[i],a[i+1]]=[a[i+1]||a[i],a[i]]}else{a[i]=pick("aeioumnstbdp".split("").filter(c=>c!==a[i]))}const f=a.join("");if(f.toLowerCase()!==lw&&f.trim())fakes.add(f)}
+  if(fakes.size<2)fakes.add(w+w.slice(-1));
+  const items=shuffle([w,...[...fakes].slice(0,2)]).map(x=>({w:x}));
+  choice(card,{mode:"Find it",text:`Which one is spelled <b>right</b>? Look at every letter.`,items,nameThem:false,isRight:b=>b.w===w,optHTML:b=>`<span style="font-size:${w.length>8?26:36}px">${esc(b.w)}</span>`,
+    prompt:()=>sayThen(`Which one says ${w}?`),after:async()=>{await sayThen(`Yes! That's ${w}.`)}})};
+function finishCustom(){killPad();if(LS.abc){const l=LS.letter;S.coins+=5;save();renderHUD();show("reward");
+  $("#reward").innerHTML=`<div class="card reward"><h2>You wrote ${l.toUpperCase()} and ${l}!</h2><div class="big-letter">${l.toUpperCase()}<span>${l}</span></div><div class="coinsup">+5 coins</div><div class="stage-duo dance">${frogSVG()}${buddySVG()}</div><div class="row ctr"><button class="btn big" id="ag">🔤 Another letter</button><button class="btn alt" id="mp">🗺️ Pond</button></div></div>`;
+  sfx.win();celebrate();say(`You wrote big ${lname2(l)} and little ${lname2(l)}!`);$("#ag").onclick=()=>show("abc");$("#mp").onclick=()=>show("map");return}
+  const w=LS.word;S.coins+=10;if(!LS.isName)S.got["M:"+w]=1;save();renderHUD();show("reward");
+  $("#reward").innerHTML=`<div class="card reward"><h2>${LS.isName?`You can write ${esc(w)}!`:`You learned ${esc(w)}!`}</h2><div class="wordshow">${esc(w)}</div><div class="coinsup">+10 coins</div>
+   <div class="stage-duo dance">${frogSVG()}${buddySVG()}</div><div class="row ctr"><button class="btn big" id="ag">✨ Another word</button><button class="btn alt" id="mp">🗺️ Map</button></div></div>`;
+  sfx.win();celebrate();say(`You learned ${w}!`);$("#ag").onclick=()=>{$("#inWord").value="";show("words")};$("#mp").onclick=()=>show("map")}
+/* voice: Claude dictation inside claude.ai only (never the browser's speech recognition, which sends audio to Google); typing always */
+function applyHeard(text,b){const inp=$("#inWord");if(b.dataset.ask){const r=parseAsk(text);inp.value=r.word;$("#isName").checked=r.name||$("#isName").checked}else inp.value=cleanWord(text);inp.dispatchEvent(new Event("input"))}
+function listen(b){if(micBtn===b){DICT?DICT.stop().catch(()=>{}):micBtn.rec&&micBtn.rec.stop();return}if(micBtn)return;stopSay();
+  if(DICT){micBtn=b;b.heard="";b.classList.add("on");DICT.start().catch(e=>{b.classList.remove("on");micBtn=null;toast(e&&e.code==="not_granted"?"The microphone is off. You can type instead!":"Pip couldn't hear that. Try again or type it.")});return}}
+function wireDictation(d){DICT=d;micOK=true;
+  d.onPartial(({text})=>{if(micBtn&&text)applyHeard(((micBtn.heard||"")+" "+text).trim(),micBtn)});
+  d.onFinal(({text})=>{if(!micBtn)return;micBtn.heard=((micBtn.heard||"")+" "+text).trim();applyHeard(micBtn.heard,micBtn)});
+  d.onState(({state,reason})=>{if(state!=="idle")return;const b=micBtn;micBtn=null;if(b){b.classList.remove("on");const v=cleanWord($("#inWord").value);if(v&&b.dataset.ask&&reason!=="not_granted"){say(`Let's learn ${v}!`)}}
+    if(reason==="unavailable"){micOK=false;DICT=null;if(!$("#words").hidden)renderWords()}});
+  if(!$("#words").hidden)renderWords()}
+
+/* ===================== GROWN-UPS ===================== */
+const NUMW=["zero","one","two","three","four","five","six","seven","eight","nine"];const TENS=["","","twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety"];const TEENS=["ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen"];
+const inWords=n=>{const h=n/100|0,r=n%100;const t=r<10?NUMW[r]:r<20?TEENS[r-10]:TENS[r/10|0]+(r%10?"-"+NUMW[r%10]:"");return `${NUMW[h]} hundred${r?" "+t:""}`};
+let gateOK=false,gateN=0;
+function renderGrown(){const host=$("#grownBody");if(!gateOK){gateN=200+Math.floor(Math.random()*780);
+    host.innerHTML=`<div class="card gate"><h2>For grown-ups</h2><p class="hint">Type this number in digits to open settings:</p><b style="font-size:22px">${inWords(gateN)}</b><input id="gateIn" inputmode="numeric" autocomplete="off" aria-label="The number in digits"><button class="btn" id="gateGo">Open</button><p class="hint" id="gateMsg"></p></div>`;
+    const go=()=>{if(+$("#gateIn").value.trim()===gateN){gateOK=true;renderGrown()}else{$("#gateMsg").textContent="That's not it. Try again.";$("#gateIn").value=""}};
+    $("#gateGo").onclick=go;$("#gateIn").onkeydown=e=>{if(e.key==="Enter")go()};return}
+  const st=S.set;const words=Object.keys(S.got).filter(k=>k.startsWith("R:")).length,spelled=Object.keys(S.got).filter(k=>k.startsWith("S:")).length;
+  host.innerHTML=`<div class="col">
+   <div class="card" style="justify-items:stretch"><h2 style="text-align:left">Progress on this device</h2><div class="statgrid">
+    <div class="stat"><b>${doneCount()}/${LESSONS}</b><span>lessons done</span></div><div class="stat"><b>${totalStars()}</b><span>stars</span></div>
+    <div class="stat"><b>${ORDER.filter(l=>S.got["L:"+l]).length}</b><span>letters met</span></div><div class="stat"><b>${words}</b><span>words read</span></div>
+    <div class="stat"><b>${spelled}</b><span>words spelled</span></div><div class="stat"><b>${S.mine.length}</b><span>My Words</span></div></div>
+    <p class="hint">Next up: lesson ${nextLesson()+1}, letter “${esc(ORDER[nextLesson()])}”. Skills this lesson: ${esc(skillsFor(nextLesson()))}.</p></div>
+   <div class="card" style="justify-items:stretch"><h2 style="text-align:left">Settings</h2><div class="set">
+
+    <label>Voice speed<select id="setRate"><option value="0.8">Slower</option><option value="1">Normal</option><option value="1.15">Faster</option></select></label>
+    ${hasClaudeTTS()?`<label>Voice<select id="setVoice"><option value="device">This device's voice (fastest)</option><option value="claude">Claude voice</option></select></label>`:""}
+    <label>Trace capital letters too<input type="checkbox" id="setCaps" ${st.caps!==false?"checked":""} style="width:26px;height:26px"></label>
+    <label>Calmer celebrations<input type="checkbox" id="setCalm" ${st.calm?"checked":""} style="width:26px;height:26px"></label>
+    <label>Open lessons up to<select id="setJump">${ORDER.map((l,i)=>`<option value="${i}">Lesson ${i+1}: ${esc(l)}</option>`).join("")}</select></label>
+    <p class="hint">Use “Open lessons up to” if your child already knows some letters. Nothing that was earned is ever taken away.</p></div></div>
+   <div class="card prose" style="justify-items:stretch"><h2>How Ribbit Reads teaches</h2>
+    <p>Every lesson follows the same short daily routine used by the Heggerty phonemic awareness curriculum, done out loud with pictures so no reading is needed: rhyming, blending, finding a sound, breaking words apart, then adding, taking away and swapping sounds. Each skill gets a little harder over 30 lessons.</p>
+    <p>Then comes phonics: a letter of the day (in the common s, a, t, p, i, n order), its sound and a mouth tip, tracing the little and capital letter, and reading and spelling words made only from letters already taught. Every fifth lesson ends with a short story your child can decode, with ❤️ heart words underlined.</p>
+    <h3>When sounds are out loud</h3><p>The device voice says single sounds as close as it can (mmm, sss, buh). For the best sounds, say them with your child: short and crisp for b, d, t; stretched for m, s, f.</p>
+    <h3>My Words and the microphone</h3><p>Your child types a word or name. When the game is opened inside Claude, they can also tap 🎤 and ask (“How do you spell dinosaur?”, “My name is Mia”): the microphone turns on only after a tap, Claude's dictation turns speech into text and the game only receives the words. On the website there is no microphone at all. Speech uses this device's own voices only. Progress and saved words stay in this browser only; nothing is sent anywhere.</p>
+    <p class="hint">Ribbit Reads is an independent game. It is not made by or affiliated with Heggerty.</p></div>
+   <div class="card" style="justify-items:start"><h2>Start over</h2><p class="hint">Erases all lessons, coins, pals and saved words on this device.</p><button class="btn berry" id="resetBtn">Erase progress…</button></div></div>`;
+  $("#setRate").value=String(st.rate||1);$("#setRate").onchange=e=>{S.set.rate=+e.target.value;save();say("This is how fast I talk.")};
+  if($("#setVoice")){$("#setVoice").value=st.voice;$("#setVoice").onchange=e=>{S.set.voice=e.target.value;save();say("Hi! I'm Pip.")}}
+  $("#setCaps").onchange=e=>{S.set.caps=e.target.checked;save()};$("#setCalm").onchange=e=>{S.set.calm=e.target.checked;save()};
+  $("#setJump").value=String(Math.max(openUpTo(),S.set.jump||0));$("#setJump").onchange=e=>{S.set.jump=Math.max(S.set.jump||0,+e.target.value);save();toast(`Lessons 1 to ${S.set.jump+1} are open.`)};
+  $("#resetBtn").onclick=()=>{const d=document.createElement("div");d.className="confirm";d.innerHTML=`<div class="card" role="dialog" aria-label="Erase progress"><h2>Erase everything?</h2><p class="hint">This can't be undone.</p><div class="row ctr"><button class="btn alt" id="no">Keep it</button><button class="btn berry" id="yes">Erase</button></div></div>`;
+    document.body.appendChild(d);d.querySelector("#no").onclick=()=>d.remove();d.querySelector("#yes").onclick=()=>{d.remove();S=fresh();save();bdNow="";renderBackdrop();toast("Progress erased.");show("map")}}}
+/* ===================== VOICE NOTE ===================== */
+function voiceHelp(){const ua=navigator.userAgent;
+  if(/iPad|iPhone/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1))return "On iPad or iPhone: Settings → Accessibility → Spoken Content → Voices → English, then download a voice.";
+  if(/Macintosh/.test(ua))return "On a Mac: System Settings → Accessibility → Spoken Content → System voice → Manage Voices.";
+  if(/Android/.test(ua))return "On Android: Settings → Accessibility → Text-to-speech output, then install English voice data.";
+  if(/Windows/.test(ua))return "On Windows: Settings → Time & language → Speech → Add voices → English.";
+  return "Add an English voice in this computer's speech settings, then reload.";}
+function renderVoiceNote(){const el=$("#voiceNote");if(!el)return;const none=voiceStatus()==="none";el.hidden=!none;
+  if(none)el.innerHTML=`<b>🔈 Pip can't talk on this device yet.</b> Pip's voice teaches the sounds, so a grown-up should add one. ${esc(voiceHelp())}`}
+
+/* ===================== BOOT ===================== */
+export async function boot(){
+  await restoreFromApp();S=loadState();base=structuredClone(S);
+  document.querySelectorAll("header [data-go]").forEach(b=>b.onclick=()=>{stopSay();show(b.dataset.go)});
+  $("#abcBtn").onclick=()=>show("abc");$("#quit").onclick=()=>leaveLesson();
+  $("#muteBtn").onclick=()=>{S.mute=!S.mute;save();if(S.mute)stopSay();renderHUD()};
+  addEventListener("pointerdown",unlockSpeech,{once:true,capture:true});
+  onOtherTabSave(()=>{if(current==="lesson"||current==="game")return;S=loadState();base=structuredClone(S);bdNow="";renderBackdrop();show(current,{push:false})});
+  onAndroidBack(()=>current==="map",goBack);
+  const cl=window.claude;
+  if(cl&&cl.use){cl.use("tts").then(t=>{if(t){setClaudeTTS(t);if(current==="grown")renderGrown();renderVoiceNote()}}).catch(()=>{});
+    cl.use("dictation").then(d=>{if(d)wireDictation(d)}).catch(()=>{})}
+  renderBackdrop();
+  const start=BYROUTE[(location.hash||"").slice(1)];
+  show(start&&!["lesson","reward","game"].includes(start)?start:"map",{push:false});
+  try{history.replaceState(null,"","#"+ROUTE[current])}catch(e){}
+  setTimeout(renderVoiceNote,2800);
+  if(new URLSearchParams(location.search).has("e2e"))window.__rr={S:()=>S,LS:()=>LS,pad:()=>pad,current:()=>current,startLesson,show,step:k=>{LS.k=k;runStep()},finish,finishCustom,startGame,teachWord,planLesson};
+}

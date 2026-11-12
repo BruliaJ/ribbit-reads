@@ -1,4 +1,4 @@
-function hatSVG(h){switch(h){
+export function hatSVG(h){switch(h){
   case "crown":return `<path d="M40 18 L42 2 L50 12 L56 0 L62 12 L70 2 L72 18 Z" fill="#FFD23F" stroke="#A87400" stroke-width="2.5" stroke-linejoin="round"/><circle cx="56" cy="13" r="2.6" fill="#E8358C"/>`;
   case "party":return `<path d="M44 18 L56 -14 L68 18 Z" fill="#3EA6FF" stroke="#1C5D99" stroke-width="2.5" stroke-linejoin="round"/><path d="M48 8 L64 8 M51 0 L61 0" stroke="#FFD93D" stroke-width="3"/><circle cx="56" cy="-15" r="4.5" fill="#FF4D8D"/>`;
   case "wizard":return `<path d="M36 18 Q56 12 76 18 Q 74 22 56 22 Q 38 22 36 18Z" fill="#5524AE"/><path d="M42 18 L60 -22 L70 18 Z" fill="#7A3FE0" stroke="#3B1880" stroke-width="2.5" stroke-linejoin="round"/><path d="M58 -2 l2 4 4 .6 -3 3 .8 4 -3.8 -2 -3.8 2 .8 -4 -3 -3 4 -.6z" fill="#FFD93D"/>`;

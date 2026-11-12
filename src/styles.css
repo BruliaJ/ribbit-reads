@@ -28,7 +28,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{min-height:100%}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:17px;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:17px;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--card)}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
@@ -332,3 +332,8 @@ main.wrap{max-width:980px;margin:0 auto;padding-block:14px 90px;padding-left:max
 .mcard.up{background:var(--card2);color:var(--ink);transform:rotateY(0) scale(1.03)}
 .mcard.got{background:var(--leaf-soft);outline:3px solid var(--leaf)}
 .abck{font-size:30px}
+
+/* lessons and games: no menu, so kids stay in the activity (✕ or Back leaves) */
+body.focus .nav{display:none}
+.voicenote{margin:0;background:var(--sun-soft);border-radius:16px;padding:12px 16px;font-weight:700;line-height:1.45}
+h1:focus,h2:focus{outline:none}

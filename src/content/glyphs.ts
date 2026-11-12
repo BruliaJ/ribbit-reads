@@ -4,7 +4,7 @@
    L x1 y1 x2 y2 = straight line; A cx cy rx ry from° to° = arc (screen angles, y down:
    -90 is the top, 90 the bottom; going from a bigger to a smaller angle runs counter-clockwise);
    D x y = a dot to tap. Stroke order follows what is usually taught in kindergarten. */
-const GL={
+export const GL: Record<string, string> = {
 a:"A .5 1.5 .5 .5 -25 -385|L 1 1 1 2",
 b:"L 0 0 0 2|A .5 1.5 .5 .5 180 540",
 c:"A .55 1.5 .55 .5 -40 -320",
@@ -57,18 +57,22 @@ W:"L 0 0 .35 2;L .35 2 .7 .6;L .7 .6 1.05 2;L 1.05 2 1.4 0",
 X:"L 0 0 1.1 2|L 1.1 0 0 2",
 Y:"L 0 0 .6 1|L 1.2 0 .6 1|L .6 1 .6 2",
 Z:"L 0 0 1.1 0;L 1.1 0 0 2;L 0 2 1.1 2"};
-const GCACHE={};
-function glyph(ch){if(GCACHE[ch])return GCACHE[ch];const src=GL[ch];if(!src)return null;
-  const strokes=src.split("|").map(st=>{let pts=[],dot=false;
-    st.split(";").forEach(seg=>{const p=seg.trim().split(/\s+/);const k=p.shift();const n=p.map(Number);
-      if(k==="L"){const [x1,y1,x2,y2]=n;const len=Math.hypot(x2-x1,y2-y1);const m=Math.max(2,Math.ceil(len/.04));for(let i=0;i<=m;i++){if(pts.length&&i===0)continue;pts.push([x1+(x2-x1)*i/m,y1+(y2-y1)*i/m])}}
-      else if(k==="A"){const [cx,cy,rx,ry,a0,a1]=n;const len=Math.abs(a1-a0)/360*2*Math.PI*Math.max(rx,ry);const m=Math.max(4,Math.ceil(len/.04));for(let i=0;i<=m;i++){if(pts.length&&i===0)continue;const a=(a0+(a1-a0)*i/m)*Math.PI/180;pts.push([cx+rx*Math.cos(a),cy+ry*Math.sin(a)])}}
-      else if(k==="D"){dot=true;pts=[[n[0],n[1]]]}});
+export type Pt = [number, number];
+export interface Stroke { pts: Pt[]; dot: boolean }
+export interface Glyph { strokes: Stroke[]; minx: number; maxx: number; w: number }
+const GCACHE: Record<string, Glyph> = {};
+export function glyph(ch: string): Glyph | null {if(GCACHE[ch])return GCACHE[ch];const src=GL[ch];if(!src)return null;
+  const strokes: Stroke[]=src.split("|").map(st=>{let pts: Pt[]=[],dot=false;
+    st.split(";").forEach(seg=>{const p=seg.trim().split(/\s+/);const k=p.shift();const n=p.map(Number) as number[];
+      if(k==="L"){const [x1=0,y1=0,x2=0,y2=0]=n;const len=Math.hypot(x2-x1,y2-y1);const m=Math.max(2,Math.ceil(len/.04));for(let i=0;i<=m;i++){if(pts.length&&i===0)continue;pts.push([x1+(x2-x1)*i/m,y1+(y2-y1)*i/m])}}
+      else if(k==="A"){const [cx=0,cy=0,rx=0,ry=0,a0=0,a1=0]=n;const len=Math.abs(a1-a0)/360*2*Math.PI*Math.max(rx,ry);const m=Math.max(4,Math.ceil(len/.04));for(let i=0;i<=m;i++){if(pts.length&&i===0)continue;const a=(a0+(a1-a0)*i/m)*Math.PI/180;pts.push([cx+rx*Math.cos(a),cy+ry*Math.sin(a)])}}
+      else if(k==="D"){dot=true;pts=[[n[0]??0,n[1]??0]]}});
     return {pts,dot}});
   let minx=1e9,maxx=-1e9;strokes.forEach(s=>s.pts.forEach(p=>{minx=Math.min(minx,p[0]);maxx=Math.max(maxx,p[0])}));
   return GCACHE[ch]={strokes,minx,maxx,w:maxx-minx}}
 /* lay out a word: letters side by side with a little gap; spaces are wider */
-function layoutText(t){let x=0;const out=[];for(const ch of t){if(ch===" "){x+=.9;continue}const g=glyph(ch);if(!g)continue;
-  out.push({ch,strokes:g.strokes.map(s=>({dot:s.dot,pts:s.pts.map(p=>[p[0]-g.minx+x,p[1]])}))});x+=g.w+.42}
+export interface Laid { ch: string; strokes: Stroke[] }
+export function layoutText(t: string): { letters: Laid[]; w: number; desc: boolean } {let x=0;const out: Laid[]=[];for(const ch of t){if(ch===" "){x+=.9;continue}const g=glyph(ch);if(!g)continue;
+  out.push({ch,strokes:g.strokes.map(s=>({dot:s.dot,pts:s.pts.map((p): Pt=>[p[0]-g.minx+x,p[1]])}))});x+=g.w+.42}
   const hasDesc=out.some(o=>o.strokes.some(s=>s.pts.some(p=>p[1]>2.2)));
   return {letters:out,w:Math.max(.5,x-.42),desc:hasDesc}}
