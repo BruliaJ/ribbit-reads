@@ -29,17 +29,26 @@ spell it; inside Claude also by voice), **Games** (Bubble Rhymes, Fly Snack, Riv
 (Pip's colors, hats, pond backgrounds, pens, celebrations; coins), **Stickers**, buddy pals (shared art with
 Loopaloo), **Grown-ups** (🔒, number-in-words gate: progress, voice speed, open lessons, calmer celebrations, reset).
 
+## Writing (tracing)
+Rules in `src/logic/trace.ts`, unit-tested with wobbly, offset and lifted "fingers" on every letter (Julia, Nov 13,
+2026: "not too hard, as long as kids are close enough to the line"). A wide band around the line (about two-thirds of
+a line-gap on Easy, never under 32 px), wobbles and small skips are fine, lifting the finger and putting it back
+anywhere on the part already traced continues, 85% of a stroke counts. Direction still matters (a stroke starts at
+its green dot), because stroke direction is what is taught. Grown-ups → Tracing help: Extra easy / Easy / Tidy.
+Tracing can cost at most one star. Long words and names are written in parts that fit the screen.
+
 ## Getting around
 - Each screen has its own address (`#pond`, `#abc`, `#words`, …), so phone/browser Back works. Leaving a lesson
   (✕ or Back) pauses it; the pond shows **▶ Keep going** at the same step. Lessons and games hide the menu.
-- Stars only for finished lessons (1–3, at least 1); coins from lessons and games; a gift every 3rd lesson in a
+- Stars only for finished lessons (1–3, at least 1); coins from lessons, and from the first 3 games each day; a gift every 3rd lesson in a
   fixed order (never random); 2 pals per lesson in the chosen world; pals never re-lock.
 
 ## Privacy and kids' law (standing decisions)
 - **No real names, ever** (Julia, Nov 12, 2026). Names can be practised in Words; they are not saved, and old saves
   that held a name are cleaned on load (`src/logic/state.ts`, tested).
 - **No microphone in the apps or on the website** (Julia, Nov 12, 2026: voice comes out before the App Store).
-  Voice questions work only inside Claude (Claude dictation; the page only receives words). Browser speech
+  Voice questions work only inside Claude (Claude dictation; the page only receives words). The code for it is
+  compiled out of the website and app builds (`__ARTIFACT__` in vite.config.ts), not just switched off. Browser speech
   recognition is never used (Chrome sends audio to Google).
 - **Speech out**: the device's own on-device voices only (online voices are skipped). If none exists, the pond shows
   how a grown-up can add one. Inside Claude a grown-up can choose Claude's voice.
@@ -64,6 +73,13 @@ Android build).
 - `npm run dev` · `npm test` · `npm run e2e` · `npm run build` (website → dist/) · `npm run build:artifact`
   (→ artifact.html for the Claude artifact) · `npm run app:sync` · `npm run gen:icons`.
 - Test hook: add `?e2e` to the address to get `window.__rr` (jump to a lesson/step); it can't change any rules.
+
+## Review log
+- Nov 13, 2026 adversarial review: Pip now names answer pictures after each question (a timing bug had silenced it);
+  forgiving tracing (above); "put it together" only uses words whose ending is spelled the way it sounds; grown-up
+  text shows sounds as /ā/ not internal codes; Grown-ups locks again when you leave it; Erase removes every copy,
+  including backups; older saves are rewritten clean at start (old names and keys gone); word stickers only after a
+  correct answer; game coins limited to 3 games a day.
 
 ## Open items
 - Julia and kids play-test: lesson length (13–18 steps; pausing helps), whether device voices say single sounds

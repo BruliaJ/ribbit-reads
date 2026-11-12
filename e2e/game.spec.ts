@@ -54,7 +54,7 @@ test('tracing a letter with a finger finishes it, little and capital, then on yo
     await page.evaluate(t => (window as any).__rr.startLesson(0, { custom: true, abc: true, letter: 'a', n: 1, steps: [{ t: 'trace', text: t, label: 'x' }, { t: 'caseMatch', L: 'a', dir: 'up' }] }), text);
     await expect(page.locator('#stage .feedback')).toContainText(/trace it|turn/i, { timeout: 15000 });
     for (const phase of ['trace', 'solo']) {
-      await page.waitForTimeout(phase === 'solo' ? 1100 : 200);
+      await expect(page.locator('#stage .feedback')).toContainText(phase === 'solo' ? /your turn/i : /trace it/i, { timeout: 15000 });
       const path = await page.evaluate(() => { const r = document.querySelector('#pw canvas')!.getBoundingClientRect(); return (window as any).__rr.pad().path().map((s: any) => ({ dot: s.dot, pts: s.pts.map((q: number[]) => [q[0]! + r.left, q[1]! + r.top]) })); });
       for (const s of path) {
         if (s.dot) { await page.mouse.click(s.pts[0][0], s.pts[0][1]); continue; }
@@ -64,7 +64,7 @@ test('tracing a letter with a finger finishes it, little and capital, then on yo
       }
       if (phase === 'trace') await expect(page.locator('#stage .feedback')).toContainText(/own/i);
     }
-    await expect(page.locator('#stage .mode')).toHaveText(/big and little/i, { timeout: 5000 });
+    await expect(page.locator('#stage .mode').first()).toHaveText(/big and little/i, { timeout: 8000 });
   }
   expect(errors).toEqual([]);
 });
@@ -145,5 +145,62 @@ test('switching worlds keeps every lesson and star, and is remembered', async ({
   await expect(page.locator('#ponds')).toContainText('Moon Base');
   const s = await page.evaluate(() => (window as any).__rr.S());
   expect(s.place).toBe('space'); expect(s.done['0']).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('a wobbly finger a little off the line, lifting halfway, still writes the letter', async ({ page }) => {
+  const errors: string[] = [], outside: string[] = [];
+  await open(page, errors, outside);
+  for (const text of ['g', 'R']) {
+    await page.evaluate(t => (window as any).__rr.startLesson(0, { custom: true, abc: true, letter: 'g', n: 8, steps: [{ t: 'trace', text: t, label: 'x' }, { t: 'caseMatch', L: 'g', dir: 'up' }] }), text);
+    await expect(page.locator('#stage .feedback')).toContainText(/trace it|turn/i, { timeout: 15000 });
+    for (const phase of ['trace', 'solo']) {
+      await expect(page.locator('#stage .feedback')).toContainText(phase === 'solo' ? /your turn/i : /trace it/i, { timeout: 15000 });
+      const path = await page.evaluate(() => { const r = document.querySelector('#pw canvas')!.getBoundingClientRect(); return (window as any).__rr.pad().path().map((s: any) => ({ dot: s.dot, pts: s.pts.map((q: number[]) => [q[0]! + r.left, q[1]! + r.top]) })); });
+      for (const s of path) {
+        if (s.dot) { await page.mouse.click(s.pts[0][0] + 12, s.pts[0][1] - 10); continue; }
+        const end = Math.floor(s.pts.length * 0.9); const mid = Math.floor(end / 2);
+        await page.mouse.move(s.pts[0][0] + 12, s.pts[0][1] + 10); await page.mouse.down();
+        for (let k = 0; k < end; k += 2) {
+          if (k === mid) { await page.mouse.up(); await page.mouse.move(s.pts[k][0] + 10, s.pts[k][1] - 8); await page.mouse.down(); }
+          const w = Math.sin(k * 0.7) * 8; await page.mouse.move(s.pts[k][0] + 12 + w, s.pts[k][1] + 10 - w);
+        }
+        await page.mouse.up();
+      }
+      if (phase === 'trace') await expect(page.locator('#stage .feedback')).toContainText(/own/i);
+    }
+    await expect(page.locator('#stage .mode').first()).toHaveText(/big and little/i, { timeout: 8000 });
+  }
+  expect(errors).toEqual([]);
+});
+
+test('long words are written in parts that fit the screen', async ({ page }) => {
+  const errors: string[] = [], outside: string[] = [];
+  await open(page, errors, outside);
+  await page.evaluate(() => (window as any).__rr.teachWord('watermelon', false));
+  await page.evaluate(() => (window as any).__rr.step(2));
+  await page.waitForTimeout(300);
+  const fits = await page.evaluate(() => (window as any).__rr.pad().path().every((s: any) => s.pts.every((q: number[]) => q[0]! > 0 && q[0]! < document.querySelector('#pw')!.clientWidth)));
+  expect(fits).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('grown-ups locks again after leaving it', async ({ page }) => {
+  const errors: string[] = [], outside: string[] = [];
+  await open(page, errors, outside);
+  await page.evaluate(() => { (window as any).__rr.show('grown'); });
+  const n = await page.evaluate(() => { const w = document.querySelector('#grownBody b')!.textContent!; return w; });
+  expect(n).toMatch(/hundred/);
+  await page.evaluate(() => (window as any).__rr.show('map'));
+  await page.evaluate(() => (window as any).__rr.show('grown'));
+  await expect(page.locator('#gateIn')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('Pip names each answer picture after asking (pre-readers need to know what 🧥 is)', async ({ page }) => {
+  const errors: string[] = [], outside: string[] = [];
+  await open(page, errors, outside);
+  await page.evaluate(() => { const rr = (window as any).__rr; rr.startLesson(6); rr.step(0); });
+  await expect(page.locator('#stage .opt.hl').first()).toBeVisible({ timeout: 8000 });
   expect(errors).toEqual([]);
 });

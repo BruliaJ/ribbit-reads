@@ -8,7 +8,7 @@ export const KEY = 'ribbitreads.v1';
 export const OLD_KEYS = ['soundhop.v1'];
 export const BACKUP_KEY = 'ribbitreads.backup';
 
-export interface Settings { rate: number; voice: 'device' | 'claude'; calm: boolean; caps: boolean; jump: number }
+export interface Settings { rate: number; voice: 'device' | 'claude'; calm: boolean; caps: boolean; jump: number; trace: 'extra' | 'normal' | 'tidy' }
 export interface Save {
   v: 1; rev: number; coins: number; plays: number; gifts: number;
   stars: Record<string, number>; done: Record<string, true>; got: Record<string, 1>;
@@ -17,6 +17,8 @@ export interface Save {
   place: string;
   world: string; unl: Record<string, number>; buddy: Record<string, number>;
   mine: string[]; games: Record<string, number>; mute: boolean; set: Settings;
+  /** coins from games are limited to 3 games a day; date only, no time */
+  gameDay?: { d: string; n: number };
 }
 export const WORLD_IDS = ['flower', 'mermaid', 'truck', 'dragon'];
 const first = (c: Cat): string => Object.keys(CATS.find(x => x[0] === c)?.[2] ?? {})[0] ?? '';
@@ -27,7 +29,7 @@ export function fresh(): Save {
     eq: { frog: 'lime', hat: 'none', pen: 'blue', party: 'confetti' },
     place: 'pond',
     world: 'flower', unl: {}, buddy: {}, mine: [], games: {}, mute: false,
-    set: { rate: 1, voice: 'device', calm: false, caps: true, jump: 0 },
+    set: { rate: 1, voice: 'device', calm: false, caps: true, jump: 0, trace: 'normal' },
   };
 }
 type Obj = Record<string, unknown>;
@@ -76,11 +78,13 @@ export function parseSave(raw: string | null): { save: Save; damaged: boolean } 
   s.mine = Array.isArray(x.mine) ? x.mine.filter(okWord).slice(0, 24) : [];
   s.games = numMap(x.games, 0, 1e4, k => k.length < 20);
   s.mute = x.mute === true;
+  if (isObj(x.gameDay) && typeof x.gameDay.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.gameDay.d)) s.gameDay = { d: x.gameDay.d, n: int(x.gameDay.n, 0, 999, 0) };
   if (isObj(x.set)) {
     const st = x.set;
     s.set.rate = [0.8, 1, 1.15].includes(Number(st.rate)) ? Number(st.rate) : 1;
     s.set.voice = st.voice === 'claude' ? 'claude' : 'device';
     s.set.calm = st.calm === true; s.set.caps = st.caps !== false; s.set.jump = int(st.jump, 0, LESSONS - 1, 0);
+    s.set.trace = st.trace === 'extra' || st.trace === 'tidy' ? st.trace : 'normal';
   }
   // never kept: a child's name (older versions stored one)
   return { save: s, damaged: false };
