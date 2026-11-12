@@ -1,0 +1,8 @@
+export function hatSVG(h){switch(h){
+  case "crown":return `<path d="M40 18 L42 2 L50 12 L56 0 L62 12 L70 2 L72 18 Z" fill="#FFD23F" stroke="#A87400" stroke-width="2.5" stroke-linejoin="round"/><circle cx="56" cy="13" r="2.6" fill="#E8358C"/>`;
+  case "party":return `<path d="M44 18 L56 -14 L68 18 Z" fill="#3EA6FF" stroke="#1C5D99" stroke-width="2.5" stroke-linejoin="round"/><path d="M48 8 L64 8 M51 0 L61 0" stroke="#FFD93D" stroke-width="3"/><circle cx="56" cy="-15" r="4.5" fill="#FF4D8D"/>`;
+  case "wizard":return `<path d="M36 18 Q56 12 76 18 Q 74 22 56 22 Q 38 22 36 18Z" fill="#5524AE"/><path d="M42 18 L60 -22 L70 18 Z" fill="#7A3FE0" stroke="#3B1880" stroke-width="2.5" stroke-linejoin="round"/><path d="M58 -2 l2 4 4 .6 -3 3 .8 4 -3.8 -2 -3.8 2 .8 -4 -3 -3 4 -.6z" fill="#FFD93D"/>`;
+  case "bow":return `<path d="M56 14 L38 4 Q34 14 38 22 Z M56 14 L74 4 Q78 14 74 22 Z" fill="#FF6FA8" stroke="#B0306A" stroke-width="2.5" stroke-linejoin="round"/><circle cx="56" cy="14" r="5" fill="#FF9EC7" stroke="#B0306A" stroke-width="2.5"/>`;
+  case "cowboy":return `<path d="M28 16 Q56 26 84 16 Q 80 22 56 24 Q 32 22 28 16Z" fill="#9A5B2A" stroke="#5E3414" stroke-width="2"/><path d="M42 18 Q42 0 50 2 Q56 6 62 2 Q70 0 70 18 Z" fill="#B87333" stroke="#5E3414" stroke-width="2.5"/><path d="M42 13 Q56 17 70 13" stroke="#E2402E" stroke-width="3" fill="none"/>`;
+  case "flower":return `<g transform="translate(56 12)">${[0,72,144,216,288].map(r=>`<ellipse cx="0" cy="-8" rx="5" ry="8" fill="#fff" stroke="#C9B6D9" stroke-width="1.5" transform="rotate(${r})"/>`).join("")}<circle r="5.5" fill="#FFC531" stroke="#C98500" stroke-width="1.5"/></g>`;
+  default:return ""}}

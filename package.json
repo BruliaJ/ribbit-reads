@@ -1,0 +1,35 @@
+{
+  "name": "ribbit-reads",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:artifact": "vite build --mode artifact --outDir dist-artifact && node scripts/inline-artifact.mjs",
+    "preview": "vite preview --port 4173",
+    "test": "vitest run",
+    "typecheck": "tsc -b",
+    "e2e": "playwright test",
+    "app:sync": "npm run build && cap sync",
+    "gen:icons": "npm run build && node scripts/gen-icons.mjs"
+  },
+  "dependencies": {
+    "@capacitor-community/text-to-speech": "8.0.2",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/preferences": "8.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/android": "8.6.2",
+    "@capacitor/cli": "8.6.2",
+    "@capacitor/ios": "8.6.2",
+    "@fontsource/andika": "5.3.0",
+    "@fontsource/fredoka": "5.3.0",
+    "@fontsource/nunito": "5.3.0",
+    "@playwright/test": "1.63.0",
+    "typescript": "5.8.3",
+    "vite": "6.3.5",
+    "vitest": "3.1.4"
+  }
+}
