@@ -151,12 +151,10 @@ export const HEART: ReadonlySet<string> = new Set(["the","is","to","a","said","w
 export interface Story { t: string; e: string; pages: [string, string][]; q: [string, string, string[]] }
 /* One per pond; decodable from that pond's letters plus ❤️ heart words (checked by tests/content.test.ts). */
 export const STORIES: Story[] = [
- {t:"Pip Sat",e:"🐸",pages:[["Pip sat.","🐸🪷"],["Tap, tap, tap!","🐸👏"],["Pip sat at a pit.","🐸🕳️"],["Sit, Pip, sit!","🐸😄"]],q:["What did Pip do?","🪑",["🚗","🍕"]]},
+ {t:"Pip Sat",e:"🐸",pages:[["Pip sat.","🐸🌿"],["Tap, tap, tap!","🐸👏"],["Pip sat at a pit.","🐸🕳️"],["Sit, Pip, sit!","🐸😄"]],q:["What did Pip do?","🪑",["🚗","🍕"]]},
  {t:"Pip and Dad",e:"🍲",pages:[["Pip and Dad sat.","🐸🐸"],["Dad got a pot.","🐸🍲"],["Pip got a mop.","🐸🧹"],["Mop, mop, mop! Pip did it!","🐸✨"]],q:["What did Dad get?","🍲",["🧹","🐶"]]},
  {t:"The Red Cap",e:"🧢",pages:[["Pip got a red cap.","🐸🧢"],["The cap is on top.","🧢🔝"],["Up, up, up! The cap is up!","🧢💨☁️"],["Pip ran and got it.","🐸🏃🧢"]],q:["What color is the cap?","🔴",["🔵","🟢"]]},
  {t:"Bug in a Hut",e:"🐛",pages:[["A big bug sat in a hut.","🐛🛖"],["The bug had a hat.","🐛🎩"],["The bug did a jig!","🐛💃🎶"],["The bug fell in the mud. Ha!","🐛🟤😂"]],q:["What did the bug have?","🎩",["👟","🍎"]]},
  {t:"Fox in a Box",e:"🦊",pages:[["A fox is in a box.","🦊📦"],["Yes! The fox can fit.","🦊👍"],["The fox can zig and zag!","🦊⚡"],["Bam! The box is flat.","📦😮"]],q:["Where is the fox?","📦",["🛏️","🌳"]]},
  {t:"The Fish Shop",e:"🐟",pages:[["Pip went to the fish shop.","🐸🏪"],["A fish sat on a rock.","🐟🪨"],["A duck got a chip.","🦆🍟"],["Quick, duck! The fish can splash!","🐟💦🦆"]],q:["What did the duck get?","🍟",["🧦","🔔"]]}];
-export interface Pond { n: string; e: string; c: string }
-export const PONDS: Pond[] = [{n:"Sunny Pond",e:"☀️",c:"#F5A623"},{n:"Mossy Log",e:"🪵",c:"#5BAA47"},{n:"Reed Island",e:"🌾",c:"#C08A2E"},{n:"Firefly Creek",e:"✨",c:"#7A5AF8"},{n:"Splashy Falls",e:"💦",c:"#2B8FD6"},{n:"Moon Pond",e:"🌙",c:"#3D4BA8"}];
 export const CAPSENT: readonly string[] = ["Pip sat on a log.","Dad got a red cap.","Max and Pip ran.","Sam has a big dog.","The cat is on the mat.","Kim can hop.","A bug is in the cup.","Ben fed the fish."];

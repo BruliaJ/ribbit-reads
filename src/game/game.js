@@ -1,7 +1,8 @@
 /* The game screens. Pure rules live in src/logic (tested); platform differences in src/host. */
-import { SND, VOW, ORDER, LESSONS, KEYW, LSND, DEC_PIC, HEART, STORIES, PONDS, CAPSENT } from '../content/data';
+import { SND, VOW, ORDER, LESSONS, KEYW, LSND, DEC_PIC, HEART, STORIES, CAPSENT } from '../content/data';
+import { WORLDS_PLAY, WORLD_BY_ID } from '../content/worlds';
 import { glyph, layoutText } from '../content/glyphs';
-import { FROGS, HATS, THEMES, PENS, PARTIES, CATS, GIFT_ORDER } from '../content/shop';
+import { FROGS, HATS, PENS, PARTIES, CATS, GIFT_ORDER } from '../content/shop';
 import { sn, ONE, MULTI, pics, rimeOf, onsetOf, rimeText, RHY, chunks, chunkSnd, DEC, letterSet, decodableAt, ADDP, SUBP, ABC, confusers, capWrong } from '../logic/phonics';
 import { planLesson, skillsFor } from '../logic/plan';
 import { parseAsk, cleanWord, capName } from '../logic/ask';
@@ -45,7 +46,7 @@ const buddySVG=(cls="")=>palSVG(buddy(),"none",cls);
 
 /* ===================== PIP THE FROG ===================== */
 let uid=0;
-function frogSVG(sk=FROGS[S.eq.frog],hat=S.eq.hat,cls=""){const id="fg"+(++uid);
+function frogSVG(sk=FROGS[S.eq.frog],hat=S.eq.hat,cls="",world=W()){const id="fg"+(++uid);
   const body=sk.rainbow?`<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">${["#FF6B6B","#FFB13D","#FFE14D","#5CD66E","#4DB0FF","#9C6BFF"].map((c,i)=>`<stop offset="${i/5}" stop-color="${c}"/>`).join("")}</linearGradient>`:
     `<radialGradient id="${id}" cx=".38" cy=".3" r=".8"><stop offset="0" stop-color="${sk.a}"/><stop offset="1" stop-color="${sk.b}"/></radialGradient>`;
   const f=`url(#${id})`,dk=sk.b;
@@ -54,7 +55,7 @@ function frogSVG(sk=FROGS[S.eq.frog],hat=S.eq.hat,cls=""){const id="fg"+(++uid);
   const hs=hat&&hat!=="none"?`<g transform="translate(${60-56*.72} ${30-18*.72}) scale(.72)">${hatSVG(hat)}</g>`:"";
   return `<svg class="frog ${cls}" viewBox="0 -14 120 132" aria-hidden="true"><defs>${body}</defs>
   <ellipse cx="60" cy="113" rx="42" ry="5" fill="rgba(0,0,0,.13)"/>
-  <g class="sb">
+  <g class="sb">${world.gearUnder||""}
    <ellipse cx="24" cy="100" rx="19" ry="11" fill="${dk}"/><ellipse cx="96" cy="100" rx="19" ry="11" fill="${dk}"/>
    <ellipse cx="60" cy="78" rx="42" ry="34" fill="${f}"/>
    ${stars}${shine}
@@ -70,7 +71,7 @@ function frogSVG(sk=FROGS[S.eq.frog],hat=S.eq.hat,cls=""){const id="fg"+(++uid);
    <g class="mo"><path d="M44 64 Q60 88 76 64 Z" fill="#7A1F3D"/><ellipse cx="60" cy="76" rx="8" ry="5" fill="#FF7A9A"/></g>
    <path class="ms" d="M46 73 Q60 64 74 73" stroke="#1E2340" stroke-width="3.5" fill="none" stroke-linecap="round"/>
    <ellipse cx="44" cy="111" rx="11" ry="5" fill="${dk}"/><ellipse cx="76" cy="111" rx="11" ry="5" fill="${dk}"/>
-   ${hs}
+   ${hs}${world.gearOver||""}
   </g></svg>`}
 function mood(el,cls,ms=700){if(!el)return;el.classList.remove("happy","sad");void el.offsetWidth;el.classList.add(cls);setTimeout(()=>el.classList.remove(cls),ms)}
 
@@ -92,8 +93,8 @@ async function sayThen(...pieces){stopSay();const id=sayId;for(const p of pieces
 /* ===================== NAVIGATION =====================
    Every screen has its own #address, so the browser's Back (and Android's Back) returns to where the child was.
    Leaving a lesson by ✕ or Back only pauses it: the pond shows "Keep going" at the same step. */
-const SECTIONS=["map","lesson","reward","games","game","closet","book","words","grown","abc"];
-const ROUTE={map:"pond",abc:"abc",words:"words",games:"games",closet:"closet",book:"stickers",grown:"grownups",lesson:"lesson",reward:"done",game:"play"};
+const SECTIONS=["map","lesson","reward","games","game","closet","book","words","grown","abc","worlds"];
+const ROUTE={map:"pond",worlds:"worlds",abc:"abc",words:"words",games:"games",closet:"closet",book:"stickers",grown:"grownups",lesson:"lesson",reward:"done",game:"play"};
 const BYROUTE=Object.fromEntries(Object.entries(ROUTE).map(([k,v])=>[v,k]));
 let current="map",PAUSED=null;
 function show(id,{push=true}={}){
@@ -102,7 +103,7 @@ function show(id,{push=true}={}){
   current=id;SECTIONS.forEach(s=>$("#"+s).hidden=s!==id);
   document.body.classList.toggle("focus",id==="lesson"||id==="game");
   document.querySelectorAll("header [data-go]").forEach(b=>b.setAttribute("aria-current",b.dataset.go===id?"true":"false"));scrollTo(0,0);
-  ({map:renderMap,abc:renderAbc,games:renderGames,closet:renderCloset,book:renderBook,words:renderWords,grown:renderGrown})[id]?.();renderHUD();
+  ({map:renderMap,worlds:renderWorlds,abc:renderAbc,games:renderGames,closet:renderCloset,book:renderBook,words:renderWords,grown:renderGrown})[id]?.();renderHUD();
   const h="#"+ROUTE[id];if(push&&location.hash!==h){try{history.pushState(null,"",h)}catch(e){location.hash=h}}
   const t=$("#"+id+" h1, #"+id+" h2");if(t&&push){t.setAttribute("tabindex","-1");t.focus({preventScroll:true})}}
 function route(){const id=BYROUTE[(location.hash||"#pond").slice(1)]||"map";
@@ -112,11 +113,14 @@ function route(){const id=BYROUTE[(location.hash||"#pond").slice(1)]||"map";
   show(id,{push:false})}
 addEventListener("popstate",route);addEventListener("hashchange",route);
 function goBack(){if(current==="map")return;if(history.length>1)history.back();else show("map")}
-function renderHUD(){$("#muteBtn").textContent=S.mute?"🔇":"🔊";$("#muteBtn").setAttribute("aria-pressed",S.mute?"true":"false");$("#starCount").textContent=totalStars();$("#coinCount").textContent=S.coins;$("#brandFrog").innerHTML=frogSVG()}
+function renderHUD(){const mi=$('header [data-go="map"] .ni');if(mi)mi.textContent=W().e;$("#muteBtn").textContent=S.mute?"🔇":"🔊";$("#muteBtn").setAttribute("aria-pressed",S.mute?"true":"false");$("#starCount").textContent=totalStars();$("#coinCount").textContent=S.coins;$("#brandFrog").innerHTML=frogSVG()}
 function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2800)}
 
-let bdNow="";function renderBackdrop(){const th=THEMES[S.eq.theme]||THEMES.lily;if(bdNow===S.eq.theme)return;bdNow=S.eq.theme;const bd=$("#bd");
-  bd.style.background=th.bg;bd.innerHTML=`<div class="hill" style="background:${th.hill[0]}"></div><div class="hill h2" style="background:${th.hill[1]}"></div>`+(REDUCED?"":Array.from({length:14},(_,i)=>th.parts(i)).join(""))}
+const W=()=>WORLD_BY_ID[S.place]||WORLDS_PLAY[0];
+let bdNow="";function renderBackdrop(){const w=W();document.body.dataset.world=w.id;const st=document.body.style;
+  st.setProperty("--stop-a",w.stop.a);st.setProperty("--stop-b",w.stop.b);st.setProperty("--stop-shadow",w.stop.shadow);st.setProperty("--stop-ink",w.stop.ink);st.setProperty("--stop-radius",w.stop.radius);st.setProperty("--trail",w.trail);
+  if(bdNow===w.id)return;bdNow=w.id;const bd=$("#bd");
+  bd.style.background=w.bg;bd.innerHTML=`<div class="hill" style="background:${w.hill[0]}"></div><div class="hill h2" style="background:${w.hill[1]}"></div>`+(REDUCED?"":Array.from({length:14},(_,i)=>w.parts(i)).join(""))}
 const STAR=on=>`<svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.6 1.3 6.5L12 17.2 6.1 20.4l1.3-6.5L2.5 9.3l6.6-.8z" fill="${on?"#FFC531":"var(--locked)"}" stroke="${on?"#C98500":"transparent"}" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
 const COIN=`<svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="#FFD23F" stroke="#B87400" stroke-width="1.6"/><circle cx="12" cy="12" r="6" fill="none" stroke="#E0A100" stroke-width="1.4"/></svg>`;
 
@@ -126,15 +130,15 @@ function renderMap(){const n=nextLesson(),open=openUpTo(),L=ORDER[n],allDone=don
   $("#heroDuo").innerHTML=frogSVG(undefined,undefined,"bob")+buddySVG();
   $("#heroHi").textContent="Hop along with Pip: hear sounds, read words, write letters big and little.";
   renderVoiceNote();
-  $("#playCard").innerHTML=`<div class="mode">${allDone?"Every pad hopped!":`Lesson ${n+1} of ${LESSONS} · ${esc(PONDS[n/5|0].n)}`}</div>
+  $("#playCard").innerHTML=`<div class="mode">${allDone?"Every lesson done!":`Lesson ${n+1} of ${LESSONS} · ${esc(W().regions[n/5|0].n)}`}</div>
    <div class="today"><div class="lotd" aria-label="Letter of the day">${L.length>1?L:L.toUpperCase()+L}</div><div style="text-align:left;display:grid;gap:4px"><b style="font-family:var(--f-display);font-size:22px">${allDone?"Play any lesson again":"Today's letter"}</b><span class="hint">${allDone?"Or make your own lesson in My Words.":`${esc(KEYW[L][1])} ${esc(KEYW[L][0])}: rhymes, sounds, reading and writing.`}</span></div></div>
    ${PAUSED&&!PAUSED.custom?`<button class="btn big" id="resumeBtn">▶ Keep going</button><span class="hint">Lesson ${PAUSED.n+1}, step ${PAUSED.k+1} of ${PAUSED.steps.length}</span>`:`<button class="btn big" id="playBtn">▶ Play!</button>`}`;
   if($("#resumeBtn"))$("#resumeBtn").onclick=resumeLesson;else $("#playBtn").onclick=()=>startLesson(n);
-  $("#ponds").innerHTML=PONDS.map((p,pi)=>{const pads=[0,1,2,3,4].map(k=>{const i=pi*5+k;const st=S.stars[i]||0;const lock=i>open;
-      return `<button class="pad ${lock?"lock":""} ${i===n&&!lock&&!S.done[i]?"next":""}" data-i="${i}" aria-label="Lesson ${i+1}, letter ${ORDER[i]}${lock?", locked":""}${st?`, ${st} stars`:""}">${lock?"🔒":esc(ORDER[i])}${k===4?`<span class="bk" aria-hidden="true">📖</span>`:""}${st?`<span class="st" aria-hidden="true">${"⭐".repeat(st)}</span>`:""}</button>`}).join("");
+  $("#ponds").innerHTML=W().regions.map((p,pi)=>{const pads=[0,1,2,3,4].map(k=>{const i=pi*5+k;const st=S.stars[i]||0;const lock=i>open;
+      return `<button class="pad ${lock?"lock":""} ${i===n&&!lock&&!S.done[i]?"next":""}" data-i="${i}" aria-label="Lesson ${i+1}, letter ${ORDER[i]}${lock?", locked":""}${st?`, ${st} stars`:""}">${lock?"🔒":esc(ORDER[i])}${k===4?`<span class="pbk" aria-hidden="true">📖</span>`:""}${st?`<span class="st" aria-hidden="true">${"⭐".repeat(st)}</span>`:""}</button>`}).join("");
     const got=[0,1,2,3,4].filter(k=>S.done[pi*5+k]).length;
     return `<div class="pond"><h3><span aria-hidden="true">${p.e}</span>${esc(p.n)}<small>${got}/5</small></h3><div class="pads">${pads}</div></div>`}).join("");
-  $("#ponds").querySelectorAll(".pad").forEach(b=>b.onclick=()=>{const i=+b.dataset.i;if(i>openUpTo()){sfx.bad();toast("Finish the pad before it to hop here!");return}startLesson(i)});
+  $("#ponds").querySelectorAll(".pad").forEach(b=>b.onclick=()=>{const i=+b.dataset.i;if(i>openUpTo()){sfx.bad();toast("Finish the one before it first!");return}startLesson(i)});
   renderPalPicker($("#mapPals"))}
 function renderPalPicker(host){const w=Wd();
   host.innerHTML=`<div class="tabs" role="group" aria-label="Pal worlds">${WORLDS.map(x=>`<button class="tab" data-w="${x.id}" aria-pressed="${x.id===w.id}">${x.ic} ${esc(x.name)}</button>`).join("")}</div>
@@ -237,7 +241,7 @@ STEPS.syllCount=(card,s)=>{const a=fresh1(Math.random()<.75?MULTI:pics(ONE).filt
     sayIt:()=>sayThen(`${a.w}. How many parts? Clap it out!`),
     demo:async()=>{await sayParts(a.sy,{gap:300,on:i=>{if(i>=0){tone(300,.05,"square",.08)}}});await sayThen(`${n} ${n===1?"part":"parts"}!`)}})};
 STEPS.segment=(card,s)=>{const a=fresh1(pics(ONE),b=>b.ph.length>=2&&b.ph.length<=s.max);const n=a.ph.length;
-  countChoice(card,{mode:"Break it apart",text:`Say <b>${esc(a.w)}</b> slowly. How many sounds? Pip hops one pad per sound.`,a,n,unit:"🪷",show:padsHTML(n).replace('class="padrow"','class="padrow" style="opacity:0" id="segpads"'),
+  countChoice(card,{mode:"Break it apart",text:`Say <b>${esc(a.w)}</b> slowly. How many sounds? Pip hops one pad per sound.`,a,n,unit:"🟢",show:padsHTML(n).replace('class="padrow"','class="padrow" style="opacity:0" id="segpads"'),
     sayIt:()=>sayThen(`${a.w}. How many sounds do you hear?`),
     demo:async()=>{const pr=card.querySelector("#segpads");pr.style.opacity=1;await sayParts(a.ph.map(sn),{gap:330,rate:.8,on:i=>lightPads(card,i)});await sayThen(`${a.w}. ${n} sounds!`)}})};
 
@@ -455,9 +459,9 @@ function celebrate(kind=S.eq.party){if(S.set.calm){confetti(40);return}({confett
 
 /* ===================== MINI-GAMES ===================== */
 const GAMES={
- rhyme:{n:"Bubble Rhymes",e:"🫧",d:"Pop every bubble that rhymes with Pip's word.",need:0},
+ rhyme:{n:"Bubble Rhymes",e:"💦",d:"Pop every bubble that rhymes with Pip's word.",need:0},
  fly:{n:"Fly Snack",e:"🪰",d:"Pip is hungry! Tap the fly wearing the letter Pip says.",need:1},
- hop:{n:"River Hop",e:"🪷",d:"Hop across the river by spelling the word, pad by pad.",need:3},
+ hop:{n:"River Hop",e:"🌊",d:"Hop across the river by spelling the word, pad by pad.",need:3},
  match:{n:"Big & Little",e:"🃏",d:"Flip the cards to find each capital and its little partner.",need:2}};
 let GS=null;
 function stopGame(){if(GS){GS.dead=true;cancelAnimationFrame(GS.raf);GS.timers.forEach(clearTimeout);GS.timers.forEach(clearInterval);GS=null}}
@@ -467,7 +471,7 @@ function renderGames(){const d=doneCount();
   $("#gameGrid").querySelectorAll(".gcard").forEach(b=>b.onclick=()=>{const g=GAMES[b.dataset.g];if(doneCount()<g.need){sfx.bad();toast(`Finish ${g.need-doneCount()} more lesson${g.need-doneCount()>1?"s":""} to open ${g.n}!`);return}startGame(b.dataset.g)})}
 function startGame(id){stopGame();GS={id,dead:false,raf:0,timers:[],score:0};show("game");$("#gtitle").textContent=GAMES[id].e+" "+GAMES[id].n;$("#gquit").onclick=()=>{stopGame();show("games")};
   ({rhyme:gameRhyme,fly:gameFly,hop:gameHop,match:gameMatch})[id]($("#gstage"))}
-function arenaHTML(){const th=THEMES[S.eq.theme]||THEMES.lily;return `<div class="arena" id="arena" style="background:${th.bg}"><div class="ghud" id="ghud"></div></div>`}
+function arenaHTML(){return `<div class="arena" id="arena" style="background:${W().bg}"><div class="ghud" id="ghud"></div></div>`}
 function gameOver(stage,text){const g=GS;if(!g)return;const coins=Math.min(15,g.score);S.coins+=coins;S.games[g.id]=Math.max(S.games[g.id]||0,g.score);save();renderHUD();stopGame();
   stage.innerHTML=`<div class="card reward"><h2>${esc(text)}</h2><div class="stage-duo dance">${frogSVG()}${buddySVG()}</div><div class="coinsup">+${coins} coins</div>
    <div class="row ctr"><button class="btn big" id="again">▶ Play again</button><button class="btn alt" id="back">🎮 Games</button><button class="btn alt" id="mp">🗺️ Map</button></div></div>`;
@@ -542,8 +546,7 @@ function renderAbc(){const known=new Set(ORDER.slice(0,doneCount()+1));
 /* ===================== CLOSET ===================== */
 function itemIcon(cat,id){const it=CATS.find(c=>c[0]===cat)[2][id];
   if(cat==="frog")return frogSVG(FROGS[id],S.eq.hat);if(cat==="hat")return frogSVG(undefined,id);
-  if(cat==="theme")return `<div style="width:100%;height:100%;display:grid;place-items:center;background:${it.bg};font-size:44px">${it.e}</div>`;
-  if(cat==="pen")return `<span style="font-family:var(--f-read);font-weight:700;font-size:44px;${it.rainbow?"background:linear-gradient(90deg,#FF4D4D,#FFB13D,#FFE14D,#4CD964,#3EA6FF,#8E5BFF);-webkit-background-clip:text;background-clip:text;color:transparent":`color:${it.c}`};${it.glow?`text-shadow:0 0 10px ${it.d||it.c}`:""}">abc</span>`;
+    if(cat==="pen")return `<span style="font-family:var(--f-read);font-weight:700;font-size:44px;${it.rainbow?"background:linear-gradient(90deg,#FF4D4D,#FFB13D,#FFE14D,#4CD964,#3EA6FF,#8E5BFF);-webkit-background-clip:text;background-clip:text;color:transparent":`color:${it.c}`};${it.glow?`text-shadow:0 0 10px ${it.d||it.c}`:""}">abc</span>`;
   return `<span>${it.e}</span>`}
 function renderCloset(){const pv=$("#closetPreview");pv.innerHTML=`<span class="dance">${frogSVG()}</span><span>${buddySVG()}</span><div style="display:grid;gap:6px;text-align:left"><b style="font-family:var(--f-display);font-size:22px">Pip and ${esc(buddy().n)}</b><span class="hint">Earn coins in lessons and games. Every 3rd lesson brings a surprise gift.</span></div>`;
   $("#closetBody").innerHTML=CATS.map(([cat,label,set])=>`<div class="section-title"><h2>${label}</h2>${cat==="party"?`<span>Plays when you finish a lesson. Tap a picture to preview it.</span>`:""}</div><div class="shop">${Object.entries(set).map(([id,it])=>{const own=S.own[cat].includes(id),eq=S.eq[cat]===id;
@@ -551,10 +554,10 @@ function renderCloset(){const pv=$("#closetPreview");pv.innerHTML=`<span class="
    `<div class="section-title"><h2>Buddy pals</h2><span>Your buddy cheers you on</span></div><div class="card" id="closetPals" style="justify-items:stretch"></div>`;
   renderPalPicker($("#closetPals"));
   $("#closetBody").querySelectorAll("[data-prev]").forEach(el=>{el.onclick=el.onkeydown=e=>{if(e.type==="keydown"&&e.key!=="Enter"&&e.key!==" ")return;celebrate(el.dataset.prev)}});
-  $("#closetBody").querySelectorAll("[data-eq]").forEach(b=>b.onclick=()=>{const [c,id]=b.dataset.eq.split(":");S.eq[c]=id;save();sfx.pop();if(c==="theme")renderBackdrop();renderCloset();renderHUD()});
+  $("#closetBody").querySelectorAll("[data-eq]").forEach(b=>b.onclick=()=>{const [c,id]=b.dataset.eq.split(":");S.eq[c]=id;save();sfx.pop();renderCloset();renderHUD()});
   $("#closetBody").querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>{const [c,id]=b.dataset.buy.split(":");const it=CATS.find(x=>x[0]===c)[2][id];
     if(S.coins<it.price){sfx.bad();toast(`You need ${it.price-S.coins} more coins. Finish a lesson or play a game to earn them!`);return}
-    S.coins-=it.price;S.own[c].push(id);S.eq[c]=id;save();sfx.coin();toast(`New ${it.n}!`);if(c==="theme")renderBackdrop();renderCloset();renderHUD();confetti(80)})}
+    S.coins-=it.price;S.own[c].push(id);S.eq[c]=id;save();sfx.coin();toast(`New ${it.n}!`);renderCloset();renderHUD();confetti(80)})}
 
 /* ===================== STICKERS ===================== */
 function renderBook(){const g=S.got;const lettersGot=ORDER.filter(l=>g["L:"+l]).length;
@@ -677,7 +680,7 @@ function renderVoiceNote(){const el=$("#voiceNote");if(!el)return;const none=voi
 export async function boot(){
   await restoreFromApp();S=loadState();base=structuredClone(S);
   document.querySelectorAll("header [data-go]").forEach(b=>b.onclick=()=>{stopSay();show(b.dataset.go)});
-  $("#abcBtn").onclick=()=>show("abc");$("#quit").onclick=()=>leaveLesson();
+  $("#abcBtn").onclick=()=>show("abc");$("#worldsBtn").onclick=()=>show("worlds");$("#quit").onclick=()=>leaveLesson();
   $("#muteBtn").onclick=()=>{S.mute=!S.mute;save();if(S.mute)stopSay();renderHUD()};
   addEventListener("pointerdown",unlockSpeech,{once:true,capture:true});
   onOtherTabSave(()=>{if(current==="lesson"||current==="game")return;S=loadState();base=structuredClone(S);bdNow="";renderBackdrop();show(current,{push:false})});
@@ -692,3 +695,10 @@ export async function boot(){
   setTimeout(renderVoiceNote,2800);
   if(new URLSearchParams(location.search).has("e2e"))window.__rr={S:()=>S,LS:()=>LS,pad:()=>pad,current:()=>current,startLesson,show,step:k=>{LS.k=k;runStep()},finish,finishCustom,startGame,teachWord,planLesson};
 }
+
+/* ===================== WORLDS (free to switch; same lessons and progress everywhere) ===================== */
+function renderWorlds(){
+  $("#worldGrid").innerHTML=WORLDS_PLAY.map(w=>`<button class="wcard ${w.id===S.place?"on":""}" data-w="${w.id}" style="background:${w.bg}" aria-pressed="${w.id===S.place}">
+    <span class="wfrog">${frogSVG(undefined,undefined,"",w)}</span><span class="wstops" aria-hidden="true">${[0,1,2].map(i=>`<i style="background:radial-gradient(circle at 40% 35%,${w.stop.a},${w.stop.b});border-radius:${w.stop.radius};box-shadow:0 3px 0 ${w.stop.shadow}"></i>`).join("")}</span>
+    <span class="wname"><b>${w.e} ${esc(w.n)}</b><small>${esc(w.blurb)}</small>${w.id===S.place?"<small>✓ You're here</small>":""}</span></button>`).join("");
+  $("#worldGrid").querySelectorAll(".wcard").forEach(b=>b.onclick=()=>{if(b.dataset.w===S.place){show("map");return}S.place=b.dataset.w;save();sfx.good();renderBackdrop();renderHUD();say(`Welcome to ${W().n}!`);show("map");mood($("#heroDuo .frog"),"happy")})}

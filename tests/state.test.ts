@@ -33,4 +33,11 @@ describe('saved progress', () => {
     const base = fresh(); base.coins = 100; const mine = structuredClone(base); mine.coins = 0; const theirs = structuredClone(base); theirs.coins = 10;
     expect(mergeSaves(base, mine, theirs).coins).toBe(0);
   });
+  it('saves from before worlds: paid backgrounds become free worlds and their coins come back (once)', () => {
+    const r = parseSave(JSON.stringify({ coins: 10, own: { theme: ['lily', 'candy', 'space'] }, eq: { theme: 'space' } }))!;
+    expect(r.save.coins).toBe(10 + 35 + 70); expect(r.save.place).toBe('space');
+    const again = parseSave(JSON.stringify(r.save))!;
+    expect(again.save.coins).toBe(r.save.coins); expect(again.save.place).toBe('space');
+    expect(parseSave(JSON.stringify({ place: 'mars' }))!.save.place).toBe('pond');
+  });
 });

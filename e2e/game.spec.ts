@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /* Plays the real built game. `?e2e` exposes a small test hook (window.__rr); it only jumps around, it can't change rules. */
-const SCREENS = ['map', 'abc', 'words', 'games', 'closet', 'book', 'grown'] as const;
+const SCREENS = ['map', 'worlds', 'abc', 'words', 'games', 'closet', 'book', 'grown'] as const;
 
 async function open(page: Page, errors: string[], outside: string[]) {
   page.on('pageerror', e => errors.push(e.message));
@@ -131,5 +131,19 @@ test('grown-ups area needs the number in digits', async ({ page }) => {
     const [h, rest] = w!.split(' hundred'); let v = N.indexOf(h!) * 100; const r = (rest ?? '').trim(); if (r) { if (TE.includes(r)) v += 10 + TE.indexOf(r); else { const [t, o] = r.split('-'); const ti = T.indexOf(t!); if (ti > 0) v += ti * 10 + (o ? N.indexOf(o) : 0); else v += N.indexOf(t!); } } return v; }, words);
   await page.fill('#gateIn', String(n)); await page.click('#gateGo');
   await expect(page.locator('#resetBtn')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('switching worlds keeps every lesson and star, and is remembered', async ({ page }) => {
+  const errors: string[] = [], outside: string[] = [];
+  await open(page, errors, outside);
+  await page.evaluate(() => { const rr = (window as any).__rr; rr.startLesson(0); rr.LS().k = rr.LS().steps.length - 1; rr.finish(); rr.show('map'); });
+  await page.click('#worldsBtn'); await expect(page).toHaveURL(/#worlds$/);
+  await page.click('.wcard[data-w="space"]');
+  await expect(page.locator('#ponds')).toContainText('Moon Base');
+  await page.reload();
+  await expect(page.locator('#ponds')).toContainText('Moon Base');
+  const s = await page.evaluate(() => (window as any).__rr.S());
+  expect(s.place).toBe('space'); expect(s.done['0']).toBe(true);
   expect(errors).toEqual([]);
 });
