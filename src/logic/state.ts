@@ -2,6 +2,7 @@
    Rules: never lose progress, never re-lock a pal, never store a child's real name. Pure (no storage access). */
 import { CATS, type Cat } from '../content/shop';
 import { LESSONS } from '../content/data';
+import { WORLD_BY_ID, OLD_THEMES } from '../content/worlds';
 
 export const KEY = 'ribbitreads.v1';
 export const OLD_KEYS = ['soundhop.v1'];
@@ -12,6 +13,8 @@ export interface Save {
   v: 1; rev: number; coins: number; plays: number; gifts: number;
   stars: Record<string, number>; done: Record<string, true>; got: Record<string, 1>;
   own: Record<Cat, string[]>; eq: Record<Cat, string>;
+  /** the world being played (Lily Pond, Outer Space …); `world` is the buddy-pal collection */
+  place: string;
   world: string; unl: Record<string, number>; buddy: Record<string, number>;
   mine: string[]; games: Record<string, number>; mute: boolean; set: Settings;
 }
@@ -20,8 +23,9 @@ const first = (c: Cat): string => Object.keys(CATS.find(x => x[0] === c)?.[2] ??
 export function fresh(): Save {
   return {
     v: 1, rev: 0, coins: 20, plays: 0, gifts: 0, stars: {}, done: {}, got: {},
-    own: { frog: ['lime'], hat: ['none'], theme: ['lily'], pen: ['blue'], party: ['confetti'] },
-    eq: { frog: 'lime', hat: 'none', theme: 'lily', pen: 'blue', party: 'confetti' },
+    own: { frog: ['lime'], hat: ['none'], pen: ['blue'], party: ['confetti'] },
+    eq: { frog: 'lime', hat: 'none', pen: 'blue', party: 'confetti' },
+    place: 'pond',
     world: 'flower', unl: {}, buddy: {}, mine: [], games: {}, mute: false,
     set: { rate: 1, voice: 'device', calm: false, caps: true, jump: 0 },
   };
@@ -56,6 +60,15 @@ export function parseSave(raw: string | null): { save: Save; damaged: boolean } 
     s.own[c] = [...new Set([first(c), ...own])];
     const eq = isObj(x.eq) ? x.eq[c] : undefined;
     s.eq[c] = typeof eq === 'string' && s.own[c].includes(eq) ? eq : first(c);
+  }
+  if (typeof x.place === 'string' && x.place in WORLD_BY_ID) s.place = x.place;
+  else {
+    // saves from before worlds: the paid background becomes its (free) world, and its coins come back
+    const oldOwn = isObj(x.own) && Array.isArray(x.own.theme) ? (x.own.theme as unknown[]) : [];
+    const refund = [...new Set(oldOwn)].reduce<number>((t, id) => t + (typeof id === 'string' ? OLD_THEMES[id]?.price ?? 0 : 0), 0);
+    s.coins = Math.min(1e6, s.coins + refund);
+    const oldEq = isObj(x.eq) && typeof x.eq.theme === 'string' ? x.eq.theme : '';
+    s.place = OLD_THEMES[oldEq]?.to ?? 'pond';
   }
   s.world = typeof x.world === 'string' && WORLD_IDS.includes(x.world) ? x.world : 'flower';
   s.unl = numMap(x.unl, 0, 99, k => WORLD_IDS.includes(k));

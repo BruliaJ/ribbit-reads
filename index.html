@@ -15,7 +15,7 @@
   <div class="brandrow"><span id="brandFrog" aria-hidden="true"></span><span class="logo">Ribbit Reads</span></div>
   <div class="hud"><span class="pill" aria-label="Stars">⭐ <span id="starCount">0</span></span><span class="pill" aria-label="Coins"><svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="#FFD23F" stroke="#B87400" stroke-width="1.6"/></svg> <span id="coinCount">0</span></span><button class="iconbtn" id="muteBtn" aria-label="Sound on or off">🔊</button><button class="iconbtn" data-go="grown" aria-label="Grown-ups">🔒</button></div>
   <nav class="nav" aria-label="Main">
-    <button data-go="map"><span class="ni">🗺️</span>Pond</button>
+    <button data-go="map"><span class="ni">🐸</span>Map</button>
     <button data-go="abc"><span class="ni">🔤</span>ABC</button>
     <button data-go="words"><span class="ni">🎤</span>Words</button>
     <button data-go="games"><span class="ni">🎮</span>Games</button>
@@ -28,7 +28,7 @@
     <div class="hero"><div class="duo" id="heroDuo"></div><div><h1>Ribbit Reads</h1><p id="heroHi"></p></div></div>
     <div class="card playcard" id="playCard"></div>
     <p class="voicenote" id="voiceNote" role="status" hidden></p>
-    <button class="btn sky" id="abcBtn" style="justify-self:center">🔤 Practice any letter, big and little</button>
+    <div class="row ctr"><button class="btn sun" id="worldsBtn">🌍 Change world</button><button class="btn sky" id="abcBtn">🔤 Practice any letter</button></div>
     <div class="ponds" id="ponds"></div>
     <div class="section-title"><h2>Your buddy</h2><span>Pick a pal to hop with Pip</span></div>
     <div class="card" id="mapPals" style="justify-items:stretch"></div>
@@ -64,6 +64,10 @@
   </div></section>
   <section id="abc" hidden>
     <div class="section-title"><h2>ABC practice</h2><span>Read and write every letter, big and little</span></div><div id="abcBody"></div>
+  </section>
+  <section id="worlds" hidden>
+    <div class="section-title"><h2>Pick a world!</h2><span>Same lessons, same stars, a whole new place</span></div>
+    <div class="worldgrid" id="worldGrid"></div>
   </section>
   <section id="grown" hidden><div id="grownBody"></div></section>
 </main>

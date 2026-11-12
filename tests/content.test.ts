@@ -1,15 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { ORDER, KEYW, LSND, SND, STORIES, HEART, LESSONS, PONDS, CAPSENT } from '../src/content/data';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { ORDER, KEYW, LSND, SND, STORIES, HEART, LESSONS, CAPSENT } from '../src/content/data';
+import { WORLDS_PLAY } from '../src/content/worlds';
 import { BANK, ONE, DEC, chunks, letterSet, canDecode, decodableAt, chunkSnd } from '../src/logic/phonics';
 import { glyph, layoutText } from '../src/content/glyphs';
 
 /* Emoji added in Unicode 14+ (2021) show as empty boxes on older iPads. */
 const NEW_EMOJI = /[\u{1FA70}-\u{1FAFF}\u{1FAE0}-\u{1FAFF}\u{1F6DD}-\u{1F6DF}\u{1F7F0}]/u;
-const OK_2020 = new Set(['🪵', '🪨', '🪰', '🪁', '🪀', '🪐', '🛖', '🪶']);
+const OK_2020 = new Set(['🪵', '🪨', '🪰', '🪁', '🪀', '🪐', '🛖', '🪶', '🪑', '🪙']);
 const tooNew = (e: string) => [...e].some(ch => NEW_EMOJI.test(ch) && !OK_2020.has(ch));
 
 describe('content', () => {
-  it('has 30 lessons, 6 ponds, 6 stories', () => { expect(LESSONS).toBe(30); expect(PONDS).toHaveLength(6); expect(STORIES).toHaveLength(6); });
+  it('has 30 lessons, 6 stories, and every world has 6 regions (one per 5 lessons)', () => { expect(LESSONS).toBe(30); for (const w of WORLDS_PLAY) expect(w.regions, w.id).toHaveLength(LESSONS / 5); expect(STORIES).toHaveLength(6); });
   it('every letter of the day has a keyword, picture, mouth tip and sound', () => {
     for (const L of ORDER) { expect(KEYW[L], L).toBeDefined(); expect(LSND[L], L).toBeDefined(); expect(SND[LSND[L] ?? ''] ?? (LSND[L] === 'ks' || LSND[L] === 'kw' ? 'x' : undefined), L).toBeDefined(); }
   });
@@ -30,6 +33,7 @@ describe('content', () => {
       for (const p of b.ph ?? []) expect(SND[p], `${b.w}: ${p}`).toBeDefined();
     }
     for (const [L, k] of Object.entries(KEYW)) expect(tooNew(k[1]), `${L} ${k[1]}`).toBe(false);
+    for (const w of WORLDS_PLAY) for (const r of [w, ...w.regions]) expect(tooNew(r.e), `${w.id} ${r.n} ${r.e}`).toBe(false);
     for (const d of DEC) if (d.e) expect(tooNew(d.e), `${d.w} ${d.e}`).toBe(false);
   });
   it('no two listening words share a picture (a picture must name one word)', () => {
@@ -51,4 +55,11 @@ describe('content', () => {
   });
   it('capital-letter sentences start with a capital and end with a period', () => { for (const s of CAPSENT) expect(s, s).toMatch(/^[A-Z].*\.$/); });
   it('double letters say one sound', () => { expect(chunks('bell')).toEqual(['b', 'e', 'll']); expect(chunkSnd('ll')).toBe('l'); expect(chunks('quick')).toEqual(['qu', 'i', 'ck']); });
+  it('no emoji anywhere in the game is too new for older iPads', () => {
+    const walk = (d: string): string[] => readdirSync(d).flatMap(n => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : [p]; });
+    for (const f of walk('src').concat('index.html')) {
+      const bad = [...readFileSync(f, 'utf8')].filter(ch => tooNew(ch));
+      expect([...new Set(bad)].join(''), f).toBe('');
+    }
+  });
 });
